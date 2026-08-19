@@ -97,6 +97,27 @@ def save_signals(conn, signals: list[dict]):
     conn.commit()
 
 
+# --- Step 4: deduplicate the table -------------------------------------
+def deduplicate_signals(conn):
+    cur = conn.cursor()
+
+    # Exact match on source_name + title (safe, always correct)
+    cur.execute(
+        """
+        DELETE s1
+        FROM signals s1
+        JOIN signals s2
+            ON s1.source_name = s2.source_name
+            AND s1.title = s2.title
+            AND s1.id > s2.id
+        """
+    )
+    removed = cur.rowcount
+    conn.commit()
+
+    print(f"Dedup: removed {removed} exact duplicates.")
+
+
 # --- Main -----------------------------------------------------------
 def main():
     print("Calling the agent...")
@@ -108,6 +129,9 @@ def main():
     try:
         save_signals(conn, signals)
         print("Saved to database.")
+
+        print("Running deduplication...")
+        deduplicate_signals(conn)
     finally:
         conn.close()
 
