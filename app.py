@@ -150,9 +150,9 @@ def generate_data(seed: int = 42):
         status = rng.choices(STATUSES, weights=[0.30, 0.25, 0.35, 0.10])[0]
         total_articles = rng.randint(1, 14)
         distinct_sources = rng.randint(1, min(total_articles, 8))
-        opp_rows.append({    
+        opp_rows.append({        
             "id": i,
-            "code": f"OS-{i:03d}",
+            "code": f"OS-{i:03d}",  
             "vertical": vertical,
             "use_case": use_case,
             "technology": tech,

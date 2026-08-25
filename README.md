@@ -32,7 +32,7 @@ These discoveries must be mapped across at least one of the following targeted e
 
 ---
 
-## 🛠️ Operational Rules & Data Integrity
+## 🛠️ Operational Rules & Data Integrity    
 
 To maintain an uncompromised baseline of analytical value, the agent operates under strict operational guardrails:
 
