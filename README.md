@@ -34,13 +34,38 @@ These discoveries must be mapped across at least one of the following targeted e
 
 ## 🛕 Project architecture
 
+## 🛠️ Tech stack 
+
+|Tool               |       Function        |
+|-------------------|-----------------------|
+|Python             | Programming language  |
+|SQL                | db type               |
+|drawDB             | db schema             |
+|Azure              | cloud computing       |
+| AI foundry agent  | AI agent              |
+|Git/github         | version control       |
+
+>> explain specific tools used and why they are good for this project. 
+
 
 ## 📁 Repo structure
+
+
+
 
 ## 💻 Installation 
 
 
-## 🛠️ Operational Rules & Data Integrity    
+
+
+**Open user interface** : 
+
+``` 
+streamlit run app.py 
+```
+
+
+## 📃Operational Rules & Data Integrity    
 
 To maintain an uncompromised baseline of analytical value, the agent operates under strict operational guardrails:
 
@@ -73,16 +98,35 @@ To feed seamlessly into downstream relational databases, automated innovation ra
 }
 ```
 
-### 📈 Upstream Metadata Design Notes
+
+## 🎡 Database structure
+![](db_schema.png)
+*We generated three tables: one containing the articles, one with the opportunity space and a table connecting the two*
+
+## 📈 Upstream Metadata Design Notes
 
 1. **Explicit Tags vs. Vector Spaces:** While vector embeddings calculate semantic similarity to build raw thematic clusters, the agent explicitly extracts string literals (`technology_keyword`, `targeted_vertical`, `use_case_tag`). This dual-layer approach combines unsupervised machine learning (embeddings) with deterministic structural filters for robust dashboard querying.
 2. **Normalized Datetime Hooks:** The `publication_date` string is restricted to strict `YYYY-MM-DD` compliance, ensuring programmatic freshness calculations and automatic deprecation sorting down the line.
 
-### Timeline 
+## 💫 Top 5 unique features 
+top 5
+
+
+## 🔍 Limitations and future outlooks
+At least 3
+
+
+## 👽 Usage of AI and its importance
+
+## 💡 Scoring explained 
+
+## ✅ Accuracy of results 
+
+## ⌛Timeline 
 
 This project was completed in two weeks. 
 
-### 🔦 Credits 
+## 🔦 Credits 
 The innovation radar was set up by the members of our team at Becode - data science and AI bootcamp: 
 - [Gunay Bayramova](https://github.com/Gunay-Bayramova) : team lead
 - [Vicror Courtois](https://github.com/VictorCourtois135) : repo manager/tech lead
