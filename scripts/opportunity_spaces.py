@@ -105,7 +105,7 @@ def compute_cluster_scores(conn, signal_ids: list[int]) -> dict:
     source_names = [r.source_name for r in rows]
 
     urgency_scores = [compute_urgency_score(d) for d in publication_dates]
-    novelty_momentum = sum(urgency_scores) / len(urgency_scores) if urgency_scores else 30.0  # average
+    urgency_time_horizon = sum(urgency_scores) / len(urgency_scores) if urgency_scores else 30.0  # average
 
     evidence = compute_source_evidence_score(
         source_names,
@@ -118,7 +118,7 @@ def compute_cluster_scores(conn, signal_ids: list[int]) -> dict:
     return {
         "source_diversity_score": round(evidence["diversity_ratio"] * 100, 1),
         "evidence_quality": evidence["source_quality_score"],
-        "novelty_momentum": round(novelty_momentum, 1),
+        "urgency_time_horizon": round(urgency_time_horizon, 1),
         "total_articles": evidence["total_articles"],
         "distinct_sources": evidence["distinct_sources"],
     }
@@ -143,7 +143,7 @@ def extract_opportunity(conn, signal_ids: list[int]) -> dict:
     # NOTE: the agent's Instructions in Foundry must be updated to only ask for
     # vertical, use_case, technology, why_hot, why_matters, next_action,
     # strategic_relevance, capability_check_note (and skip). market_signal_strength,
-    # source_diversity, evidence_quality, and novelty_momentum are no longer
+    # source_diversity, evidence_quality, and urgency_time_horizon are no longer
     # requested from the agent -- they are all computed directly from the signal
     # data (see compute_cluster_scores). strategic_relevance is the ONLY score
     # still asked from the LLM, since it's the only genuinely qualitative judgment.
@@ -157,6 +157,14 @@ def extract_opportunity(conn, signal_ids: list[int]) -> dict:
 
     text = response.output_text.strip()
     text = text.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+
+    # Detect an outright model refusal (not malformed JSON -- a genuine "I can't help" reply)
+    # before attempting to parse, so it's reported accurately rather than lumped in with
+    # formatting errors.
+    refusal_markers = ("i'm sorry", "i cannot assist", "i can't assist", "i cannot help", "i can't help")
+    if text.lower().startswith(refusal_markers) or any(m in text.lower()[:120] for m in refusal_markers):
+        print(f"  [WARNING] Agent refused to respond for this cluster. Raw response: {repr(text)}")
+        return {"skip": True, "reason": f"Agent declined to respond: {text[:200]}"}
 
     try:
         return json.loads(text)
@@ -176,7 +184,7 @@ def compute_attractiveness_score(cluster_scores: dict, strategic_relevance: floa
         WEIGHT_MARKET_SIGNAL * cluster_scores["market_signal_strength"]
         + WEIGHT_SOURCE_DIVERSITY * cluster_scores["source_diversity_score"]
         + WEIGHT_EVIDENCE_QUALITY * cluster_scores["evidence_quality"]
-        + WEIGHT_NOVELTY_MOMENTUM * cluster_scores["novelty_momentum"]
+        + WEIGHT_NOVELTY_MOMENTUM * cluster_scores["urgency_time_horizon"]
         + WEIGHT_STRATEGIC_RELEVANCE * strategic_relevance,
         1,
     )
@@ -214,7 +222,7 @@ def merge_near_duplicate_opportunities(opportunities: list[dict]) -> list[dict]:
             merged.append(opp_a)
         else:
             best = max(group, key=lambda o: o["attractiveness_score"])
-            all_signal_ids = ", ".join(o["signal_ids"] for o in group)
+            all_signal_ids = sorted(set(sid for o in group for sid in o["signal_ids"]))
             best = {**best, "signal_ids": all_signal_ids, "merged_from": len(group)}
             merged.append(best)
             print(f"Merged {len(group)} near-duplicate opportunities into: {best['name']}")
@@ -222,10 +230,72 @@ def merge_near_duplicate_opportunities(opportunities: list[dict]) -> list[dict]:
     return merged
 
 
+# --- Save to Azure SQL Database ---------------------------------------
+def save_opportunity(conn, data: dict, cluster_scores: dict, strategic_relevance: float,
+                      attractiveness_score: float, signal_ids: list[int]) -> int:
+    cur = conn.cursor()
+
+    cur.execute(
+        "SELECT id FROM opportunity_spaces WHERE vertical = ? AND use_case = ? AND technology = ?",
+        data["vertical"], data["use_case"], data["technology"],
+    )
+    existing = cur.fetchone()
+
+    if existing:
+        opportunity_id = existing[0]
+        cur.execute(
+            """
+            UPDATE opportunity_spaces SET
+                why_hot = ?, why_matters = ?, next_action = ?, capability_check_note = ?,
+                market_signal_strength = ?, source_diversity_score = ?, evidence_quality = ?,
+                urgency_time_horizon = ?, strategic_relevance = ?,
+                total_articles = ?, distinct_sources = ?, updated_at = SYSUTCDATETIME()
+            WHERE id = ?
+            """,
+            data["why_hot"], data["why_matters"], data["next_action"],
+            data.get("capability_check_note"),
+            cluster_scores["market_signal_strength"], cluster_scores["source_diversity_score"],
+            cluster_scores["evidence_quality"], cluster_scores["urgency_time_horizon"],
+            strategic_relevance, cluster_scores["total_articles"], cluster_scores["distinct_sources"],
+            opportunity_id,
+        )
+    else:
+        cur.execute(
+            """
+            INSERT INTO opportunity_spaces
+                (vertical, use_case, technology, why_hot, why_matters, next_action,
+                 capability_check_note, market_signal_strength, source_diversity_score,
+                 evidence_quality, urgency_time_horizon, strategic_relevance,
+                 total_articles, distinct_sources)
+            OUTPUT INSERTED.id
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            data["vertical"], data["use_case"], data["technology"],
+            data["why_hot"], data["why_matters"], data["next_action"],
+            data.get("capability_check_note"),
+            cluster_scores["market_signal_strength"], cluster_scores["source_diversity_score"],
+            cluster_scores["evidence_quality"], cluster_scores["urgency_time_horizon"],
+            strategic_relevance, cluster_scores["total_articles"], cluster_scores["distinct_sources"],
+        )
+        opportunity_id = cur.fetchone()[0]
+
+    for signal_id in signal_ids:
+        cur.execute(
+            """
+            IF NOT EXISTS (SELECT 1 FROM opportunity_space_signals WHERE opportunity_space_id = ? AND signal_id = ?)
+            INSERT INTO opportunity_space_signals (opportunity_space_id, signal_id) VALUES (?, ?)
+            """,
+            opportunity_id, signal_id, opportunity_id, signal_id,
+        )
+
+    conn.commit()
+    return opportunity_id
+
+
 # --- Main -----------------------------------------------------------
 def main():
     conn = pyodbc.connect(SQL_CONN_STRING)
-    csv_rows = []
+    collected = []  # holds everything needed to save, before merging duplicates
 
     try:
         clusters = find_clusters(conn)
@@ -241,7 +311,6 @@ def main():
                 print(f"{'=' * 60}\n")
                 continue
 
-            # market_signal_strength needs the technology label, only known after extraction
             market_signal = compute_market_signal_strength(
                 cluster_scores["total_articles"], trend_keyword=data["technology"]
             )
@@ -249,7 +318,6 @@ def main():
 
             strategic_relevance = data.get("strategic_relevance", 50)
             attractiveness_score = compute_attractiveness_score(cluster_scores, strategic_relevance)
-
             name = f"{data['vertical']} x {data['use_case']} x {data['technology']}"
 
             print(f"{'=' * 60}")
@@ -273,41 +341,37 @@ def main():
             print(f"Source diversity:       {cluster_scores['source_diversity_score']} "
                   f"({cluster_scores['distinct_sources']} distinct / {cluster_scores['total_articles']} articles)")
             print(f"Evidence quality:       {cluster_scores['evidence_quality']}")
-            print(f"Novelty/momentum:       {cluster_scores['novelty_momentum']} (computed from recency)")
+            print(f"Urgency/time horizon:   {cluster_scores['urgency_time_horizon']} (computed from recency)")
             print(f"Strategic relevance:    {strategic_relevance} (LLM judgment)")
             print()
 
-            csv_rows.append({
-                "opportunity_number": i,
-                "signal_ids": ", ".join(str(s) for s in signal_ids),
-                "name": name,
-                "attractiveness_score": attractiveness_score,
-                "vertical": data["vertical"],
-                "use_case": data["use_case"],
-                "technology": data["technology"],
-                "why_hot": data["why_hot"],
-                "why_matters": data["why_matters"],
-                "next_action": data["next_action"],
-                "market_signal_strength": cluster_scores["market_signal_strength"],
-                "source_diversity_score": cluster_scores["source_diversity_score"],
-                "evidence_quality": cluster_scores["evidence_quality"],
-                "novelty_momentum": cluster_scores["novelty_momentum"],
+            collected.append({
+                "data": data,
+                "cluster_scores": cluster_scores,
                 "strategic_relevance": strategic_relevance,
-                "total_articles": cluster_scores["total_articles"],
-                "distinct_sources": cluster_scores["distinct_sources"],
-                "merged_from": 1,
+                "attractiveness_score": attractiveness_score,
+                "signal_ids": signal_ids,
+                "name": name,
+                "vertical": data["vertical"],
+                "why_matters": data["why_matters"],
             })
 
-        if csv_rows:
-            merged_rows = merge_near_duplicate_opportunities(csv_rows)
-            merged_rows.sort(key=lambda r: r["attractiveness_score"], reverse=True)
-            with open(OUTPUT_CSV_PATH, "w", newline="", encoding="utf-8") as f:
-                fieldnames = list(merged_rows[0].keys())
-                writer = csv.DictWriter(f, fieldnames=fieldnames)
-                writer.writeheader()
-                writer.writerows(merged_rows)
-            print(f"Saved {len(merged_rows)} opportunity spaces to {OUTPUT_CSV_PATH}, "
-                  f"sorted by attractiveness_score ({len(csv_rows) - len(merged_rows)} near-duplicates merged)")
+        if not collected:
+            print("No opportunities to save.")
+            return
+
+        merged = merge_near_duplicate_opportunities(collected)
+        print(f"\n{len(collected) - len(merged)} near-duplicates merged. Saving {len(merged)} opportunities to database...\n")
+
+        for item in merged:
+            opportunity_id = save_opportunity(
+                conn, item["data"], item["cluster_scores"], item["strategic_relevance"],
+                item["attractiveness_score"], item["signal_ids"],
+            )
+            print(f"Saved: {item['name']}  (attractiveness={item['attractiveness_score']})  "
+                  f"-> opportunity_spaces.id = {opportunity_id}")
+
+        print(f"\nDone. {len(merged)} opportunities saved/updated in the database.")
     finally:
         conn.close()
 
