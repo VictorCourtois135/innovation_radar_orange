@@ -1,0 +1,66 @@
+canonical_name,tier,signal_type,notes
+BIPT,1,regulation,Belgian telecom regulator
+FCC,1,regulation,US telecom regulator
+Federal Communications Commission,1,regulation,US telecom regulator (full name variant)
+Ofcom,1,regulation,UK telecom regulator
+European Commission,1,regulation,EU official body
+Digital Strategy,1,regulation,EU Digital Strategy portal
+BEREC,1,regulation,Body of European Regulators for Electronic Communications
+European 5G Observatory,1,regulation,EU official 5G monitoring body
+Reuters,1,news,Wire service
+Bloomberg,1,news,Wire service
+Gartner,2,analyst_report,Paid analyst firm
+Omdia,2,analyst_report,Paid analyst firm
+Analysys Mason,2,analyst_report,Paid analyst firm
+STL Partners,2,analyst_report,Analyst firm
+GSMA,2,analyst_report,Industry association research
+GSA,2,analyst_report,Global mobile Suppliers Association
+Global mobile Suppliers Association,2,analyst_report,GSA full name variant
+TeleGeography,2,analyst_report,Telecom market research
+Tech Policy Institute,2,analyst_report,Policy research institute
+Telecoms.com,3,news,Telecom trade press
+RCR Wireless,3,news,Telecom trade press
+Fierce Network,3,news,Telecom trade press
+Light Reading,3,news,Telecom trade press
+Mobile World Live,3,news,Telecom trade press
+Mobile Europe,3,news,Telecom trade press
+DataCenterDynamics,3,news,Data center trade press
+TelecomLead,3,news,Telecom trade press
+Data News,3,news,Belgian trade press
+Converge Network Digest,3,news,Telecom trade press
+Broadband TV News,3,news,Broadband trade press
+Computer Bild,3,news,Consumer tech press
+MobileSociety,3,news,Independent tech press
+Private LTE 5G,3,news,Private networks trade press
+Manufacturing Today,3,news,Manufacturing trade press
+Intelligent CIO Europe,3,news,Enterprise IT trade press
+ITdaily,3,news,Belgian IT trade press
+TM Forum,3,analyst_report,Telecom industry association
+TelecomObserver,3,news,Telecom trade press
+TeckNexus,3,news,Private networks trade press
+Telecom Review Europe,3,news,Telecom trade press
+Current Analysis,3,analyst_report,Analyst/research blog
+KeyBridge Wireless,3,analyst_report,CBRS/spectrum metrics provider
+BusinessWire,4,news,Press distribution wire (aggregates press releases)
+Yahoo Finance,4,news,Financial news aggregator
+EuropaWire,4,news,Press distribution/news wire
+EuropeSays,4,news,News aggregator
+MarketPulseUK,4,news,Market news aggregator
+FirstPassLab,4,news,Industry blog
+Gartner Peer Insights,4,news,User-review platform (distinct from Gartner analyst reports)
+Vodafone,5,press_release,Company-owned source
+Verizon,5,press_release,Company-owned source
+AT&T,5,press_release,Company-owned source
+Deutsche Telekom,5,press_release,Company-owned source
+Telefonica,5,press_release,Company-owned source
+Proximus,5,press_release,Company-owned source
+Ericsson,5,press_release,Vendor-owned source
+Nokia,5,press_release,Vendor-owned source
+AWS,5,press_release,Vendor-owned source
+TIM,5,press_release,Gruppo TIM company pressTelefónica,3,press_release,auto-classified
+Telefónica,3,press_release,auto-classified
+Technology Brief,2,news,auto-classified
+Palo Alto Networks,3,press_release,auto-classified
+Electronics Media,2,news,auto-classified
+Fortinet,3,press_release,auto-classified
+TelecomTV,2,news,auto-classified

@@ -76,8 +76,10 @@ def get_embedding(text: str) -> list[float]:
 
 
 # --- Step 3: save each signal to Azure SQL Database -------------------
-def save_signals(conn, signals: list[dict]):
+def save_signals(conn, signals: list[dict]) -> int:
     cur = conn.cursor()
+    inserted_count = 0
+
     for s in signals:
         # Skip if this URL already exists (SQL Server has no native ON CONFLICT)
         cur.execute("SELECT COUNT(*) FROM signals WHERE source_url = ?", s["source_url"])
@@ -94,7 +96,10 @@ def save_signals(conn, signals: list[dict]):
             s["source_url"], s["source_name"], s.get("title"), s.get("publication_date"),
             s.get("targeted_vertical"), s.get("country"), s["summary"], s.get("raw_excerpt"), embedding_json,
         )
+        inserted_count += 1
+
     conn.commit()
+    return inserted_count
 
 
 # --- Step 4: deduplicate the table -------------------------------------
@@ -127,8 +132,9 @@ def main():
 
     conn = pyodbc.connect(SQL_CONN_STRING)
     try:
-        save_signals(conn, signals)
-        print("Saved to database.")
+        inserted_count = save_signals(conn, signals)
+        skipped_count = len(signals) - inserted_count
+        print(f"Saved to database: {inserted_count} new signals inserted, {skipped_count} duplicates skipped.")
 
         print("Running deduplication...")
         deduplicate_signals(conn)
