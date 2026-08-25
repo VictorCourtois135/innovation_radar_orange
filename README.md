@@ -32,6 +32,14 @@ These discoveries must be mapped across at least one of the following targeted e
 
 ---
 
+## 🛕 Project architecture
+
+
+## 📁 Repo structure
+
+## 💻 Installation 
+
+
 ## 🛠️ Operational Rules & Data Integrity    
 
 To maintain an uncompromised baseline of analytical value, the agent operates under strict operational guardrails:
@@ -69,3 +77,14 @@ To feed seamlessly into downstream relational databases, automated innovation ra
 
 1. **Explicit Tags vs. Vector Spaces:** While vector embeddings calculate semantic similarity to build raw thematic clusters, the agent explicitly extracts string literals (`technology_keyword`, `targeted_vertical`, `use_case_tag`). This dual-layer approach combines unsupervised machine learning (embeddings) with deterministic structural filters for robust dashboard querying.
 2. **Normalized Datetime Hooks:** The `publication_date` string is restricted to strict `YYYY-MM-DD` compliance, ensuring programmatic freshness calculations and automatic deprecation sorting down the line.
+
+### Timeline 
+
+This project was completed in two weeks. 
+
+### 🔦 Credits 
+The innovation radar was set up by the members of our team at Becode - data science and AI bootcamp: 
+- [Gunay Bayramova](https://github.com/Gunay-Bayramova) : team lead
+- [Vicror Courtois](https://github.com/VictorCourtois135) : repo manager/tech lead
+- [Mahalakshmi Palanivel](https://github.com/mahalakshmip1604): data architect/tech lead
+- [Anna Diacofotaki](https://github.com/anna-diaco): documentation specialist
