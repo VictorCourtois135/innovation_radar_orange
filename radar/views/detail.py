@@ -21,7 +21,7 @@ from radar import theme
 # No scoring or weighting is performed on this page.
 SCORE_COMPONENTS = [
     {
-        "column": "market_signal_score",
+        "column": "market_signal_strength",
         "component": "Market signal strength",
         "short": "Market",
         "source": "⚙ code",
@@ -40,7 +40,7 @@ SCORE_COMPONENTS = [
         ),
     },
     {
-        "column": "evidence_quality_score",
+        "column": "evidence_quality",
         "component": "Evidence quality",
         "short": "Evidence",
         "source": "⚙ code",
@@ -49,7 +49,7 @@ SCORE_COMPONENTS = [
         ),
     },
     {
-        "column": "urgency_score",
+        "column": "urgency_time_horizon",
         "component": "Urgency",
         "short": "Urgency",
         "source": "⚙ code",
@@ -58,7 +58,7 @@ SCORE_COMPONENTS = [
         ),
     },
     {
-        "column": "strategic_relevance_score",
+        "column": "strategic_relevance",
         "component": "Strategic relevance",
         "short": "Strategic",
         "source": "◆ LLM judgement",
