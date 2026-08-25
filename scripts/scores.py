@@ -10,7 +10,7 @@ import math
 import os
 import re
 import time
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 
 # scripts/extract_opportunities_preview.py -> go up one level, then into source/
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -123,37 +123,100 @@ def compute_urgency_score(publication_date_str: str, reference_date: date = None
     return round(max(score, 5.0), 1)  # floor at 5, never exactly 0
 
 
-_trends_cache: dict[str, float] = {}  # avoid re-querying the same keyword twice in one run
+TRENDS_CACHE_PATH = os.path.join(_PROJECT_ROOT, "source", "trends_cache.json")
+TRENDS_CACHE_EXPIRY_DAYS = 7  # re-check a SUCCESSFUL keyword's popularity after a week
+TRENDS_FAILURE_RETRY_HOURS = 24  # but retry a FAILED lookup (rate-limited/timed out) after just 1 day
+
+
+def _load_trends_cache() -> dict:
+    try:
+        with open(TRENDS_CACHE_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def _save_trends_cache_entry(keyword: str, score):
+    cache = _load_trends_cache()
+    cache[keyword] = {"score": score, "fetched_at": datetime.now().isoformat()}
+    os.makedirs(os.path.dirname(TRENDS_CACHE_PATH), exist_ok=True)
+    with open(TRENDS_CACHE_PATH, "w", encoding="utf-8") as f:
+        json.dump(cache, f, indent=2)
+
+
+_trends_disk_cache = _load_trends_cache()  # loaded once per process, persists across runs
+
+# Always-on delay between successful calls, to avoid ever triggering a block in the first place.
+# Deliberately slow -- reliability over speed, since Google's unofficial API has no official rate.
+BASE_DELAY_SECONDS = 20
 
 
 def get_google_trends_score(keyword: str):
     """Queries Google Trends for the average search interest (0-100) of a
     keyword over the last 12 months. Returns None if the query fails or no
     data is available (e.g. keyword too niche/new) -- caller should fall back
-    to the article-volume-only score in that case."""
-    if keyword in _trends_cache:
-        return _trends_cache[keyword]
+    to the article-volume-only score in that case.
 
-    try:
-        from pytrends.request import TrendReq
+    Results are cached to disk (`trends_cache.json`) for TRENDS_CACHE_EXPIRY_DAYS
+    days, so the same keyword is never re-queried across multiple runs within
+    that window.
 
-        pytrends = TrendReq(hl="en-US", tz=360)
-        pytrends.build_payload([keyword], timeframe="today 12-m")
-        data = pytrends.interest_over_time()
+    Deliberately patient: waits ~20-30s between calls even on success (Google's
+    unofficial API has no documented rate limit, so this is a conservative
+    guess), and on a 429 retries up to 5 times with a long exponential backoff
+    (up to several minutes) before giving up on THAT keyword only. Unlike an
+    earlier version, a failure on one keyword does NOT disable Trends for the
+    rest of the run -- the next keyword gets its own full set of retries, since
+    rate-limiting in practice seems to often be per-request-burst rather than a
+    hard, run-long IP ban."""
+    cached_entry = _trends_disk_cache.get(keyword)
+    if cached_entry:
+        fetched_at = datetime.fromisoformat(cached_entry["fetched_at"])
+        age = datetime.now() - fetched_at
+        was_successful = cached_entry["score"] is not None
+        still_fresh = (age.days < TRENDS_CACHE_EXPIRY_DAYS if was_successful
+                       else age < timedelta(hours=TRENDS_FAILURE_RETRY_HOURS))
+        if still_fresh:
+            return cached_entry["score"]
+        # else: fall through and actually retry -- either the success expired,
+        # or this was a past failure (rate-limit/timeout) old enough to retry
 
-        if data.empty or keyword not in data.columns:
-            _trends_cache[keyword] = None
+    import random
+    max_retries = 5
+    base_backoff = 20  # seconds, before exponential growth
+
+    for attempt in range(max_retries):
+        try:
+            from pytrends.request import TrendReq
+
+            pytrends = TrendReq(hl="en-US", tz=360)
+            pytrends.build_payload([keyword], timeframe="today 12-m")
+            data = pytrends.interest_over_time()
+
+            if data.empty or keyword not in data.columns:
+                _save_trends_cache_entry(keyword, None)
+                return None
+
+            avg_interest = float(data[keyword].mean())
+            _save_trends_cache_entry(keyword, avg_interest)
+            time.sleep(BASE_DELAY_SECONDS + random.uniform(0, 10))  # deliberately slow, be polite
+            return avg_interest
+
+        except Exception as e:
+            is_rate_limit = "429" in str(e)
+            if is_rate_limit and attempt < max_retries - 1:
+                wait = base_backoff * (2 ** attempt)  # 20, 40, 80, 160s
+                print(f"  [Google Trends] Rate limited on '{keyword}', waiting {wait}s before "
+                      f"retry {attempt + 2}/{max_retries}...")
+                time.sleep(wait)
+                continue
+            elif is_rate_limit:
+                print(f"  [Google Trends] Still rate limited on '{keyword}' after {max_retries} "
+                      f"attempts. Skipping this keyword only (next keywords will still be tried).")
+            else:
+                print(f"  [Google Trends] Could not fetch data for '{keyword}': {e}")
+            _save_trends_cache_entry(keyword, None)
             return None
-
-        avg_interest = float(data[keyword].mean())
-        _trends_cache[keyword] = avg_interest
-        time.sleep(1)  # be polite to the unofficial API, avoid rate-limit blocks
-        return avg_interest
-
-    except Exception as e:
-        print(f"  [Google Trends] Could not fetch data for '{keyword}': {e}")
-        _trends_cache[keyword] = None
-        return None
 
 
 def compute_market_signal_strength(total_articles: int, trend_keyword: str = None,
