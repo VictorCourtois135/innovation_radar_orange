@@ -1,12 +1,35 @@
 # 🤖 Innovation Signal Monitoring & Competitive Intelligence  Agent
 
-This repository contains the configuration and operational instructions for an automated **AI Monitoring Agent**. The agent is automated **Extraction Agent** engineered to crawl, evaluate, and extract structured market signals from the open web and specialized tech publications and systematically scan, filter, and extract high-value competitive market signals and regulatory shifts across global and regional telecommunications and IT enterprise sectors. It sits upstream of our data pipeline, feeding clean payloads directly into the processing engine.
+## 📄 Brief description
 
-## 🎯 Purpose & Core Objective
+This is an Orange Business challenge undertaken at the Becode-data science and AI bootcamp. The mission is to create an innovation radar, where Orange Business can quickly evaluate emerging opportunity spaces in areas of strategic interest to get an informed decision on whether to pursue them. This tool is designed for three main target groups: 
+- strategists and innovators
+- sales team
+- presales and proposal teams
+
+
+## 🎯 Core objectives & methodology 
+
+### a. Objectives 
+
+We structure our Orange Business mission with the following objectives: 
+- automate collection of publicaly available market insights to pinpoint emerging cutting-edge technologies, deployments of new infrastructures, advances of Orange Business competitors. We focus on both specific tech websites and de novo sites found by the agent in line with strategic priorities of Orange Business. 
+- store these information into an sql database (db) on Azure
+- generate opportunity spaces from the scraped information 
+- generate a score for each opportunity space to provide a hierarchy of priorities for Orange Business. We will provide **30 unique, high-quality OP** 
+- create a customized user interface for the target groups to explore the data
+
+
+### b. Methodology
+
+We first created an AI extracting agent to crawl and extract structured market signals from the open web including customized specialized tech websites, according to Orange Business key interests (i.e., global and regional telecommunications and IT sectors). We then store these results into an SQL database hosted in Azure. Subsequently, we use a second engineered AI agent, that allows us to create opportunity spaces from the previous input. 
+
+
+
 
 The primary purpose of this agent is to automate competitive intelligence gathering. It scans the internet to identify exactly where and how Orange’s core global competitors (including **Deutsche Telekom, Vodafone, Proximus, BT, Verizon, and  AT&T etc**) are advancing, executing infrastructure rollouts, or outcompeting Orange Business in the enterprise market.
 
-The primary mission is to identify 30 **unique, high-quality external web sources** mapping breakthroughs across these technical horizons:
+The primary mission is to identify 30 **unique, high-quality external web sources** mapping breakthroughs across the areas of interest of Orange Business:
 
 * **Next-Gen Networks:** 5G Standalone (SA), network slicing, non-terrestrial networks (NTN/satellite-to-phone), and fiber rollouts.
 * **Cybersecurity:** Zero-trust frameworks, threat prevention, digital sovereignty, and network defense parameters.
@@ -30,9 +53,16 @@ These discoveries must be mapped across at least one of the following targeted e
 * **Logistics & Transport**
 * **Public Sector & Defense**
 
+
+
 ---
 
 ## 🛕 Project architecture
+
+![pipeline](20260825_readme_images.png)
+
+*Schematic representation of our pipeline*
+
 
 ## 🛠️ Tech stack 
 
@@ -43,13 +73,16 @@ These discoveries must be mapped across at least one of the following targeted e
 |drawDB             | db schema             |
 |Azure              | cloud computing       |
 | AI foundry agent  | AI agent              |
+| Streamlit         |  User interface       |
 |Git/github         | version control       |
+
 
 >> explain specific tools used and why they are good for this project. 
 
 
 ## 📁 Repo structure
 
+This repository contains the configuration and operational instructions for an automated **AI Monitoring Agent**. The agent is automated **Extraction Agent** engineered to crawl, evaluate, and extract structured market signals from the open web and specialized tech publications and systematically scan, filter, and extract high-value competitive market signals and regulatory shifts across global and regional telecommunications and IT enterprise sectors. It sits upstream of our data pipeline, feeding clean payloads directly into the processing engine.
 
 
 
@@ -121,6 +154,16 @@ At least 3
 ## 💡 Scoring explained 
 
 ## ✅ Accuracy of results 
+
+## ⚔️ Challenges 
+- country name: because of prompt eg USA or united states etc. 
+- time 30 vs 50 results (50 not running); even sometimes 30 run with no issue, but sometimes it run +++ time. 
+- keep optimizing the prompt to cover all the innovative topics, all over the world, competitive. 
+- Cost: increases with keywords input. 
+- create the db with student subscription 
+- scoring 
+- google trends API: limit of requests per specific time (not sure if day, hour etc.)
+- 
 
 ## ⌛Timeline 
 
