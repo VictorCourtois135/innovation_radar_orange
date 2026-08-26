@@ -62,8 +62,8 @@ Prompt can be viewed in "Prompts" folder.
 |SQL                | db type               |
 |drawDB             | db schema             |
 |Azure              | cloud computing       |
-| AI foundry agent  | AI agent              |
-| Streamlit         |  User interface       |
+|AI foundry agent   | AI agent              |
+|Streamlit          |  User interface       |
 |Git/github         | version control       |
 
 
@@ -152,6 +152,6 @@ This project was completed in two weeks.
 ## 🔦 Credits 
 The innovation radar was set up by the members of our team at Becode - data science and AI bootcamp: 
 - [Gunay Bayramova](https://github.com/Gunay-Bayramova) : team lead
-- [Vicror Courtois](https://github.com/VictorCourtois135) : repo manager/tech lead
+- [Victor Courtois](https://github.com/VictorCourtois135) : repo manager/tech lead
 - [Mahalakshmi Palanivel](https://github.com/mahalakshmip1604): data architect/tech lead
 - [Anna Diacofotaki](https://github.com/anna-diaco): documentation specialist
