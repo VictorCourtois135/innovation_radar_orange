@@ -95,6 +95,73 @@ def _stored_components(row: pd.Series) -> pd.DataFrame:
     return pd.DataFrame(records)
 
 
+def _render_status_control(data: dict, row: pd.Series) -> None:
+    """Selectbox + button to change this opportunity's status in Azure SQL.
+
+    Disabled with an explanation when the app is running off the CSV
+    snapshot: there's no live database connection to write through in that
+    mode, and silently editing only the in-memory dataframe would make the
+    change disappear on the next refresh without saying so.
+    """
+    current_status = row.get("status", C.STATUS_UNKNOWN)
+
+    # If a status value in the data isn't one of the configured options
+    # (e.g. C.STATUS_UNKNOWN, or something set directly in the database
+    # outside this dropdown's choices), add it so the selectbox can still
+    # show the real current value instead of silently defaulting to the
+    # first option in the list.
+    options = list(C.STATUS_OPTIONS)
+    if current_status not in options:
+        options = [current_status] + options
+
+    is_live = data.get("source") == "azure_sql"
+
+    st.markdown("### Status")
+    status_col, button_col = st.columns([2, 1])
+
+    with status_col:
+        chosen_status = st.selectbox(
+            "Status",
+            options,
+            index=options.index(current_status),
+            key=f"status_select_{row['id']}",
+            label_visibility="collapsed",
+            disabled=not is_live,
+        )
+
+    with button_col:
+        update_clicked = st.button(
+            "Update status",
+            disabled=not is_live or chosen_status == current_status,
+            use_container_width=True,
+        )
+
+    if not is_live:
+        st.caption(
+            "Status can only be changed when connected to the live Azure SQL "
+            "database — the app is currently showing the CSV snapshot."
+        )
+    elif chosen_status == current_status:
+        st.caption(f"Current status: **{current_status}**.")
+
+    if update_clicked:
+        success, message = data_module.update_status(row["id"], chosen_status)
+        if success:
+            st.success(message)
+            # The cached load_data() result still has the old status; clear
+            # it so the next run re-reads the value that was just written,
+            # rather than showing a stale one until the cache's TTL expires.
+            st.cache_data.clear()
+            # Re-select the same opportunity after the rerun triggered by
+            # the cache clear, since a fresh "filtered" dataframe means this
+            # page's own widget state (built from the old data) can't be
+            # trusted to line up with the new one on its own.
+            st.session_state["selected_opportunity_id"] = row["id"]
+            st.rerun()
+        else:
+            st.error(message)
+
+
 def render(data: dict, df: pd.DataFrame) -> None:
     theme.banner(
         "Opportunity detail",
@@ -115,9 +182,27 @@ def render(data: dict, df: pd.DataFrame) -> None:
         for _, row in ranked.iterrows()
     }
 
+    # If the "Top opportunities" table/chart was clicked, opportunities.py
+    # leaves the chosen id here. Consumed with pop() so it only forces the
+    # selectbox once — after that, the selectbox's own key drives its value
+    # like normal, so the user can still change the choice by hand.
+    incoming_id = st.session_state.pop("selected_opportunity_id", None)
+    if incoming_id is not None:
+        match = next((label for label, oid in labels.items() if oid == incoming_id), None)
+        if match is not None:
+            st.session_state["detail_selectbox"] = match
+
+    # Guard against a stale selection: if the current filters (sidebar or
+    # persona) have narrowed df so the previously chosen label no longer
+    # exists, drop it rather than letting the widget raise on a value that
+    # isn't among its current options.
+    if st.session_state.get("detail_selectbox") not in labels:
+        st.session_state.pop("detail_selectbox", None)
+
     chosen_label = st.selectbox(
         "Opportunity space",
         list(labels.keys()),
+        key="detail_selectbox",
     )
 
     row = df[df["id"] == labels[chosen_label]].iloc[0]
@@ -141,6 +226,8 @@ def render(data: dict, df: pd.DataFrame) -> None:
         """,
         unsafe_allow_html=True,
     )
+
+    _render_status_control(data, row)
 
     left, right = st.columns([3, 2], gap="large")
 
@@ -232,7 +319,7 @@ def render(data: dict, df: pd.DataFrame) -> None:
 
             radar_figure.update_traces(
                 fill="toself",
-                line=dict(color=C.ORANGE, width=2),
+                line=dict(color=C.ORANGE, width=3),
                 fillcolor="rgba(255,121,0,0.28)",
                 hovertemplate="%{theta}<br>%{r:.1f} / 100<extra></extra>",
             )
@@ -240,18 +327,18 @@ def render(data: dict, df: pd.DataFrame) -> None:
             radar_figure.update_polars(
                 radialaxis=dict(
                     gridcolor=C.GREY_BORDER,
-                    tickfont=dict(size=10),
+                    tickfont=dict(size=11),
                 ),
                 angularaxis=dict(
                     gridcolor=C.GREY_BORDER,
-                    tickfont=dict(size=10),
+                    tickfont=dict(size=13),
                 ),
                 bgcolor=C.WHITE,
             )
 
             radar_figure.update_layout(
-                height=340,
-                margin=dict(t=50, b=40, l=90, r=90),
+                height=700,
+                margin=dict(t=50, b=40, l=70, r=70),
                 paper_bgcolor=C.WHITE,
             )
 

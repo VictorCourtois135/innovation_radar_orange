@@ -8,8 +8,9 @@ Run it with:
 
     streamlit run app.py
 
-Data comes from Azure SQL when credentials are available and from the committed
-CSV snapshot otherwise. See radar/data.py and the README for the details.
+Data comes from Azure SQL when credentials are available and from the
+committed CSV snapshot otherwise. See radar/data.py and the README for the
+details.
 """
 
 from __future__ import annotations
@@ -59,7 +60,17 @@ opp_df = data["opportunities"]
 st.sidebar.markdown("## 🟠 Orange Business")
 st.sidebar.caption("Innovation Radar")
 
-page_name = st.sidebar.radio("Go to", list(PAGES.keys()), label_visibility="collapsed")
+# A page can't write directly to st.session_state["page_name"] once the
+# radio below has been instantiated this run (Streamlit forbids mutating a
+# widget's own key after creation). So other pages request navigation by
+# setting "pending_page" instead; it's consumed here, BEFORE the radio is
+# created, which is allowed.
+if "pending_page" in st.session_state:
+    st.session_state["page_name"] = st.session_state.pop("pending_page")
+
+page_name = st.sidebar.radio(
+    "Go to", list(PAGES.keys()), label_visibility="collapsed", key="page_name",
+)
 
 st.sidebar.markdown("---")
 
@@ -70,7 +81,7 @@ persona = st.sidebar.radio(
 )
 st.sidebar.caption(personas.PERSONAS[persona]["blurb"])
 
-# --- filters ---------------------------------------------------------------
+# --- filters -----------------------------------------------------------------
 st.sidebar.markdown("---")
 st.sidebar.markdown("### Filters")
 
@@ -98,7 +109,7 @@ else:
 
     filtered = personas.apply(filtered, persona)
 
-# --- provenance ------------------------------------------------------------
+# --- provenance --------------------------------------------------------------
 st.sidebar.markdown("---")
 if data["source"] == "azure_sql":
     st.sidebar.success("🟢 Live · Azure SQL")
@@ -122,3 +133,4 @@ if caveat:
     st.caption(caveat)
 
 PAGES[page_name](data, filtered)
+
