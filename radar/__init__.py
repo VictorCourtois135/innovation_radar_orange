@@ -11,4 +11,5 @@ app needs lives here:
     radar.views         one module per dashboard page
 """
 
-__all__ = ["config", "data", "scoring", "personas", "theme", "views"]
+__all__ = ["config", "data", "personas", "theme", "views"]
+           
