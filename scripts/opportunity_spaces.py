@@ -6,7 +6,7 @@ relevance, and the narrative fields), and combines everything into a single
 attractiveness_score — WITHOUT writing anything to the database.
 
 Requires the same environment variables as run_agent_and_save.py, plus the
-scoring_helpers.py module and source_registry.csv in the same folder.
+scores.py module and source_registry.csv in the same folder.
 """
 
 import os
@@ -49,8 +49,8 @@ MIN_CLUSTER_SIZE = 3
 OUTPUT_CSV_PATH = "opportunity_spaces_preview.csv"
 
 # Weights for the final attractiveness_score (must sum to 1.0) -- matches the
-# original deck formula: 30% market signal + 20% source diversity + 20% evidence
-# quality + 15% novelty/momentum + 15% strategic relevance
+# original deck formula: 30% market signal + 20% source diversity + 15% evidence
+# quality + 15% novelty/momentum + 20% strategic relevance
 WEIGHT_MARKET_SIGNAL = 0.30
 WEIGHT_SOURCE_DIVERSITY = 0.20
 WEIGHT_EVIDENCE_QUALITY = 0.15
