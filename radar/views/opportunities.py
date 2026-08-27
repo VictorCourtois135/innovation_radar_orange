@@ -160,27 +160,20 @@ def _render_sort_controls(df):
     therefore the chart above it) to know a header was clicked. This
     control replaces that with an explicit Streamlit widget, so "sort by"
     is a single piece of state both the chart and the table read from.
+
+    Order is always descending (no ascending/descending choice exposed).
     """
     available = [(col, label) for col, label in SORT_OPTIONS if col in df.columns]
     if not available:
         return "attractiveness_score", False
 
-    col_left, col_right = st.columns([3, 1])
-    with col_left:
-        sort_col = st.selectbox(
-            "Sort by",
-            options=[col for col, _ in available],
-            format_func=lambda c: dict(available)[c],
-            key="sort_column",
-        )
-    with col_right:
-        ascending = st.selectbox(
-            "Order",
-            options=[False, True],
-            format_func=lambda a: "Descending" if not a else "Ascending",
-            key="sort_ascending",
-        )
-    return sort_col, ascending
+    sort_col = st.selectbox(
+        "Sort by",
+        options=[col for col, _ in available],
+        format_func=lambda c: dict(available)[c],
+        key="sort_column",
+    )
+    return sort_col, False
 
 
 def _go_to_detail(opportunity_id) -> None:
@@ -443,7 +436,7 @@ def _render_comparison(df) -> None:
 def render(data: dict, df) -> None:
     theme.banner(
         "Top opportunity spaces",
-        "Vertical × Use case × Technology, ranked by attractiveness",
+        "Vertical × Use case × Technology",
     )
 
     if df.empty:
