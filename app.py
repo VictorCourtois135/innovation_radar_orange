@@ -44,7 +44,7 @@ PAGES = {
     "Top opportunities": opportunities.render,
     "Opportunity detail": detail.render,
     "Signal explorer": signals.render,
-    "Scoring methodology": methodology.render,
+    "Scoring model & simulator": methodology.render,
     "How it works": how_it_works.render,
 }
 
