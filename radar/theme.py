@@ -33,6 +33,39 @@ def inject_css() -> None:
         <style>
         .stApp {{ background-color: {C.WHITE}; }}
 
+        /* --------------------------------------------------------------
+         * Trim Streamlit's default top space.
+         * Two separate things add empty space above the content: (1) the
+         * toolbar/header bar Streamlit renders at the very top of the
+         * viewport (visible as the "⋮" menu), which has its own reserved
+         * height, and (2) generous top padding Streamlit adds to the
+         * first block of both the main content area and the sidebar to
+         * clear that header. With this app's own banner already carrying
+         * the page title, both add up to a large empty gap before
+         * anything shows up on screen.
+         *
+         * Every selector below is listed twice — once scoped to a
+         * data-testid container, once as a bare class — because the exact
+         * DOM/testid names Streamlit uses for these containers have
+         * changed across versions. Unmatched selectors are simply inert,
+         * so this is safe to keep even after a Streamlit upgrade.
+         * -------------------------------------------------------------- */
+        header[data-testid="stHeader"] {{
+            height: 2.25rem;
+            min-height: 2.25rem;
+        }}
+        div[data-testid="stAppViewContainer"] .main .block-container,
+        div[data-testid="stMainBlockContainer"],
+        .main .block-container {{
+            padding-top: 1rem !important;
+        }}
+        section[data-testid="stSidebar"] div[data-testid="stSidebarUserContent"],
+        section[data-testid="stSidebar"] div[data-testid="stSidebarContent"],
+        section[data-testid="stSidebar"] .block-container,
+        section[data-testid="stSidebar"] > div:first-child > div:first-child {{
+            padding-top: 1rem !important;
+        }}
+
         section[data-testid="stSidebar"] {{ background-color: {C.BLACK}; }}
         section[data-testid="stSidebar"] * {{ color: {C.WHITE} !important; }}
 
