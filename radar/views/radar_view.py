@@ -55,6 +55,20 @@ from radar import theme
 # Radial band each horizon occupies. Inner = more urgent.
 RING_BOUNDS = {"Now": (0.15, 0.95), "Next": (1.15, 1.95), "Later": (2.15, 2.95)}
 RING_MAX = 3.0
+TOP_LABEL_COUNT = 10
+
+def _format_radar_label(value) -> str:
+    """Split a technology label over two short lines."""
+    words = str(value).strip().split()
+
+    if len(words) <= 1:
+        return str(value).strip()
+
+    midpoint = (len(words) + 1) // 2
+    first_line = " ".join(words[:midpoint])
+    second_line = " ".join(words[midpoint:])
+
+    return f"{first_line}<br>{second_line}"
 
 
 def _radius_for(row) -> float:
@@ -105,6 +119,8 @@ def _prepare(df: pd.DataFrame) -> pd.DataFrame:
     radii: list[float] = []
     # How many bubbles are already on this spoke, so the n-th one is fanned off
     # centre rather than drawn on top of the first.
+    group_sizes = plot_df["vertical_group"].value_counts().to_dict()
+
     seen: dict[str, int] = {}
 
     for _, row in plot_df.iterrows():
@@ -112,12 +128,18 @@ def _prepare(df: pd.DataFrame) -> pd.DataFrame:
         index = seen.get(group, 0)
         seen[group] = index + 1
 
-        # 0, +9, -9, +18, -18 ... degrees off the spoke, capped so a bubble never
-        # drifts into the neighbouring sector.
-        offset = ((index + 1) // 2) * 9.0 * (1 if index % 2 else -1)
-        offset = float(np.clip(offset, -step / 2.5, step / 2.5))
-        thetas.append(base_angle[group] + offset)
+        # Spread every bubble evenly across the available sector instead of
+        # repeatedly placing crowded bubbles at the same maximum offset.
+        group_size = group_sizes[group]
 
+        if group_size == 1:
+            offset = 0.0
+        else:
+            sector_limit = step * 0.42
+            offsets = np.linspace(-sector_limit, sector_limit, group_size)
+            offset = float(offsets[index])
+
+        thetas.append(base_angle[group] + offset)
         radii.append(_radius_for(row))
 
     plot_df["theta"] = thetas
@@ -151,7 +173,7 @@ def _ring_backdrop(fig: go.Figure) -> None:
 
 def render(data: dict, df) -> None:
     theme.banner(
-        "Innovation Radar",
+        "Find the opportunity before the competitor does",
         "Opportunity spaces by vertical (sector) and time horizon (ring)",
     )
 
@@ -175,6 +197,9 @@ def render(data: dict, df) -> None:
         return
 
     plot_df = _prepare(df)
+    top_label_codes = set(
+    plot_df.nlargest(TOP_LABEL_COUNT, "attractiveness_score")["code"]
+)
     groups = sorted(plot_df["vertical_group"].unique())
 
     # Size: fit the reference to the data actually on screen rather than letting
@@ -201,7 +226,10 @@ def render(data: dict, df) -> None:
                 theta=subset["theta"],
                 mode="markers+text",
                 name=f"{horizon} ({len(subset)})",
-                text=subset["code"],
+                text=[
+                    _format_radar_label(technology) if code in top_label_codes else ""
+                    for code, technology in zip(subset["code"], subset["technology"])
+                ],
                 textposition="top center",
                 textfont=dict(size=11, color=C.GREY_DARK),
                 marker=dict(
@@ -209,11 +237,18 @@ def render(data: dict, df) -> None:
                     sizemode="area",
                     # One shared reference across all three traces, so a bubble in
                     # the Later ring is comparable to one in the Now ring.
-                    sizeref=(2.0 * float(sized.max())) / (46.0 ** 2),
+                    sizeref=(2.0 * float(sized.max())) / (36.0 ** 2),
                     sizemin=8,
                     color=C.HORIZON_COLORS[horizon],
                     opacity=0.88,
-                    line=dict(width=2, color=C.WHITE),  # 2px surface ring
+                    line=dict(width=3, color=[
+                        C.STATUS_COLORS.get(
+                            status,
+                            C.STATUS_COLORS[C.STATUS_UNKNOWN],
+                        )
+                        for status in subset["status"].fillna(C.STATUS_UNKNOWN)
+                    ],
+                ),
                 ),
                 customdata=np.stack([
                     subset["name"].astype(str),
@@ -278,10 +313,10 @@ def render(data: dict, df) -> None:
         ),
         bgcolor=C.WHITE,
         # Leave room around the circle so long sector names are not clipped.
-        domain=dict(x=[0.13, 0.87], y=[0.02, 0.9]),
+        domain=dict(x=[0.04, 0.96], y=[0.02, 0.94]),
     )
     fig.update_layout(
-        height=680,
+        height=1000,
         paper_bgcolor=C.WHITE,
         font_color=C.GREY_DARK,
         showlegend=True,
