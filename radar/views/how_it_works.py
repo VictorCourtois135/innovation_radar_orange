@@ -85,7 +85,7 @@ def render_visual_pipeline():
                 Strictly isolates Orange-owned sources. Outputs structured JSON.
             </div>
         </div>
-        <div class="pipeline-arrow">↓ <span style="font-size:0.8rem; color:#9A3412; font-family:monospace;">one row per article</span></div>
+        <div class="pipeline-arrow">↓ <span style="font-size:0.8rem; color:#9A3412; font-family:monospace;"></span></div>
     """, unsafe_allow_html=True)
 
     # Step 2
@@ -95,11 +95,11 @@ def render_visual_pipeline():
             <div class="pipeline-header">Signals Processing Table</div>
             <div class="pipeline-body">
                 Stored in <span class="pipeline-badge">Azure SQL Database</span>. Deduplicated 
-                rigorously on URL, then title. Article summaries are vectorized using 
+                on URL, then title. Article summaries are embedded using 
                 <code>text-embedding-3-large</code> into a <span class="pipeline-badge">VECTOR(1536)</span> field.
             </div>
         </div>
-        <div class="pipeline-arrow">↓ <span style="font-size:0.8rem; color:#9A3412; font-family:monospace;">cosine similarity &gt; 0.82</span></div>
+        <div class="pipeline-arrow">↓ <span style="font-size:0.8rem; color:#9A3412; font-family:monospace;"></span></div>
     """, unsafe_allow_html=True)
 
     # Step 3
@@ -108,8 +108,8 @@ def render_visual_pipeline():
             <div class="pipeline-sub">Step 3 — Algorithmic Grouping</div>
             <div class="pipeline-header">Semantic Clustering</div>
             <div class="pipeline-body">
-                Executed via pure SQL and a <span class="pipeline-badge">Python union-find</span> algorithm. 
-                Groups related signals. Requires <b>3+ articles</b> to proceed; single reports never become opportunities.
+                Executed via SQL and a <span class="pipeline-badge">Python union-find</span> algorithm. 
+                Groups related signals. Requires a cosine similarity score > 0.82 and <b>3+ articles</b> to proceed (i.e., single reports never become opportunities).
             </div>
         </div>
         <div class="pipeline-arrow">↓</div>
@@ -121,8 +121,7 @@ def render_visual_pipeline():
             <div class="pipeline-sub">Step 4 — Portfolio Alignment</div>
             <div class="pipeline-header">Capability & Geo Check</div>
             <div class="pipeline-body">
-                Evaluated against Orange's deployed footprint. Existing European private-5G products are 
-                automatically skipped to ensure the engine acts as a <b>market-entry tool</b>, not a product catalog.
+                Evaluated against Orange's already deployed services (i.e., automatically skipped to ensure the engine acts as a <b>market-entry tool</b>).
             </div>
         </div>
         <div class="pipeline-arrow">↓</div>
@@ -134,7 +133,7 @@ def render_visual_pipeline():
             <div class="pipeline-sub">Step 5 — Synthesis</div>
             <div class="pipeline-header">Scoring & Extraction</div>
             <div class="pipeline-body">
-                Computes 4 data-driven metrics and 1 qualitative model metric. Merges any near-duplicate 
+                Computes 4 data-driven metrics (signal market, diversity, evidence, urgency) and 1 qualitative LLM generated metric (strategy). Merges any near-duplicate 
                 opportunity fields before final delivery.
             </div>
         </div>
@@ -147,7 +146,7 @@ def render_visual_pipeline():
             <div class="pipeline-sub">Step 6 — UI Layer</div>
             <div class="pipeline-header">Opportunity Spaces Table</div>
             <div class="pipeline-body">
-                Feeds the final user-facing radar view dashboard with contextualized, traceable trends.
+                User-friendly radar view dashboard with detailed information of signals, opportunity spaces and trends.
             </div>
         </div>
     """, unsafe_allow_html=True)
@@ -226,15 +225,20 @@ flagging Orange's own product catalogue as opportunities.
   produces more cybersecurity articles. What the radar sees is a function of
   what it was told to look for, and the current prompt explicitly excludes 5G
   topics and weights 2026 most heavily.
-- **`status` is never written.** The column exists and the dashboard reads it,
-  but the extraction pipeline does not populate it, so every row shows as
-  unclassified. Promoting an opportunity to a watchlist is not yet persisted.
 - **Personas are filter presets, not model tags.** The original design had an
   `opportunity_space_personas` table with an LLM judgement per row. It did not
   survive the move from PostgreSQL to Azure SQL. The three buttons in the
   sidebar approximate the audiences using existing columns and say so.
-- **Country lives on signals, not on opportunities.** The markets shown for an
-  opportunity are rolled up from its linked signals, so an opportunity backed by
-  articles about three countries will list three.
+- **There are country-specific signals, not opportunity spaces.** Opportunities emerge without knowledge of the strategic country.
+The country should be taken into account in the workflow to ensure the implementation of the innovation.
+  
         """
     )
+
+    st.markdown("### Detailed project information")
+    st.markdown(""" 
+
+To have access to all code, prompts and a detailed description of our project, please visit the github page of our team: https://github.com/VictorCourtois135/innovation_radar_orange
+
+""" 
+                )
