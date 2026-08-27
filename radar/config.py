@@ -130,3 +130,57 @@ COLUMN_ALIASES = {
     "opportunity_number": "id",
     "target_vertical": "targeted_vertical",
 }
+# Vertical grouping
+# ---------------------------------------------------------------------------
+# Raw vertical values from the data are granular ("Enterprise IT",
+# "Enterprise Security", ...). For filtering, several of these are variants
+# of the same broader category. This dict is the single place to adjust
+# that grouping — edit the lists below to reassign a vertical to a
+# different group, or add a new group entirely.
+VERTICAL_GROUPS: dict[str, list[str]] = {
+    "Enterprise": [
+        "Enterprise",
+        "Enterprise AI infrastructure",
+        "Enterprise IT",
+        "Enterprise Security",
+    ],
+    "Telecom & connectivity": [
+        "Cloud infrastructure",
+        "Fixed broadband",
+        "IoT connectivity",
+        "Telecom / Edge",
+        "Telecom Infrastructure",
+        "Telecommunications",
+        "Telecoms / Cloud",
+        "Telecoms regulation",
+    ],
+    "Manufacturing": [
+        "Manufacturing",
+    ],
+    "Public sector": [
+        "Public sector",
+    ],
+}
+
+
+def vertical_group_map() -> dict[str, str]:
+    """Map each raw vertical value to its group label.
+
+    Any vertical value present in the data but not listed above falls back
+    to "Other" at lookup time, so a new vertical appearing in a future data
+    refresh doesn't silently disappear from the filters — it just shows up
+    ungrouped until someone adds it to VERTICAL_GROUPS.
+    """
+    return {
+        value: group
+        for group, values in VERTICAL_GROUPS.items()
+        for value in values
+    }
+    
+STATUS_DISPLAY_TO_STORED = {
+    "Candidate": "candidate",
+    "Validated": "kept",
+    "Rejected": "rejected",
+    "Watchlist": "watchlist",
+}
+STATUS_OPTIONS = list(STATUS_DISPLAY_TO_STORED.keys())

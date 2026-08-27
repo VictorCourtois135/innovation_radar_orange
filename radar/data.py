@@ -27,6 +27,8 @@ import pandas as pd
 import streamlit as st
 
 from radar import config
+from dotenv import load_dotenv
+load_dotenv()
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SNAPSHOT_PATH = PROJECT_ROOT / config.SNAPSHOT_DIR
@@ -147,6 +149,32 @@ def _load_from_snapshot() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
 # ---------------------------------------------------------------------------
 # Normalisation
 # ---------------------------------------------------------------------------
+def _normalise_status_casing(series: pd.Series) -> pd.Series:
+    """Map raw stored status values to their display label.
+
+    config.STATUS_DISPLAY_TO_STORED defines the mapping (e.g. stored "kept"
+    -> displayed "Validated"). This inverts it and matches case-
+    insensitively, so a stored "Kept", "kept", or "KEPT" all become the
+    same displayed "Validated" regardless of how the pipeline or an older
+    manual edit happened to write it. Values not found in the mapping (e.g.
+    config.STATUS_UNKNOWN) pass through unchanged.
+    """
+    display_by_stored_lower = {
+        stored.lower(): display
+        for display, stored in config.STATUS_DISPLAY_TO_STORED.items()
+    }
+
+    def _fold(value):
+        if value is None or (isinstance(value, float) and pd.isna(value)):
+            return value
+        text = str(value).strip()
+        if not text:
+            return value
+        return display_by_stored_lower.get(text.lower(), value)
+
+    return series.apply(_fold)
+
+
 def _normalise_opportunities(df: pd.DataFrame) -> pd.DataFrame:
     """Make one dataframe the rest of the app can rely on.
 
@@ -197,6 +225,7 @@ def _normalise_opportunities(df: pd.DataFrame) -> pd.DataFrame:
         df["status"] = df["status"].fillna(config.STATUS_UNKNOWN).replace(
             "", config.STATUS_UNKNOWN
         )
+        df["status"] = _normalise_status_casing(df["status"])
 
     for col in config.SCORE_COLUMNS + ["attractiveness_score"]:
         if col in df.columns:
@@ -332,3 +361,63 @@ def signals_for_opportunity(opportunity_id, sig_df: pd.DataFrame,
         link_df["opportunity_space_id"] == opportunity_id, "signal_id"
     ].tolist()
     return sig_df[sig_df["id"].isin(ids)]
+
+
+# ---------------------------------------------------------------------------
+# Writes
+# ---------------------------------------------------------------------------
+def update_status(opportunity_id, new_status_display: str) -> tuple[bool, str]:
+    """Write a new status value for one opportunity back to Azure SQL.
+
+    new_status_display is a label from config.STATUS_OPTIONS (e.g.
+    "Validated"), which is translated to the exact lowercase value the
+    database's CHECK constraint requires (e.g. "kept") before writing —
+    see config.STATUS_DISPLAY_TO_STORED. Writing the display label as-is
+    would violate that constraint for any label whose stored word differs
+    from its lowercase (all of them here, since the db's real word for
+    "Validated" is "kept").
+
+    Deliberately the only write path in this module — everything else here
+    only reads. Only works against the live database: there's nothing
+    sensible to "write" to a CSV snapshot that a later git pull would just
+    overwrite, so this requires real Azure SQL credentials and fails
+    explicitly (rather than silently editing the in-memory dataframe only)
+    if they aren't available.
+
+    Returns (success, message). On failure, message explains why, so the
+    caller can show it to the user instead of failing silently.
+    """
+    cfg = get_sql_config()
+    if cfg is None:
+        return False, (
+            "No Azure SQL credentials found — status can only be changed "
+            "when connected to the live database, not from the CSV snapshot."
+        )
+
+    stored_value = config.STATUS_DISPLAY_TO_STORED.get(new_status_display)
+    if stored_value is None:
+        return False, f"Unknown status \"{new_status_display}\" — not in config.STATUS_DISPLAY_TO_STORED."
+
+    try:
+        conn = _connect(cfg, max_retries=1, wait_seconds=5)
+    except Exception as exc:
+        return False, f"Could not reach Azure SQL ({type(exc).__name__})."
+
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE opportunity_spaces SET status = ? WHERE id = ?",
+            stored_value,
+            int(opportunity_id),
+        )
+        conn.commit()
+        updated = cursor.rowcount
+    except Exception as exc:
+        conn.close()
+        return False, f"Update failed ({type(exc).__name__}): {exc}"
+
+    conn.close()
+
+    if updated == 0:
+        return False, f"No opportunity with id {opportunity_id} was found to update."
+    return True, "Status updated."
