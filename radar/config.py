@@ -20,21 +20,63 @@ GREY_LIGHT = "#F2F2F2"
 GREY_BORDER = "#DDDDDD"
 WHITE = "#FFFFFF"
 
-# Sequential ramp used for anything ordered low -> high.
+# ---------------------------------------------------------------------------
+# Chart colour system
+# ---------------------------------------------------------------------------
+# Colour does exactly one of four jobs, and each job gets its own set. Mixing
+# them up is what made the earlier all-orange version unreadable: a sequential
+# ramp was used to colour bars whose LENGTH already carried the same number, so
+# the colour channel was spent twice on one variable and never once on identity.
+#
+#   CATEGORICAL  identity  - which series is this            -> CAT, fixed order
+#   SEQUENTIAL   magnitude - how much                        -> ORANGE_RAMP
+#   ORDINAL      rank      - which step in an ordered set    -> ORANGE_RAMP
+#   STATUS       state     - good / warning / serious / bad  -> STATUS_COLORS
+#
+# CAT keeps the Orange Business brand orange in slot 1, so the first (and often
+# only) series on any chart is still brand-coloured. Slots 2-5 are taken from a
+# palette validated for colour-vision deficiency; the order below was checked
+# rather than eyeballed, with `dataviz/scripts/validate_palette.js`:
+#
+#   CAT[:5] on white, adjacent pairs (bars, stacks, lines):
+#       worst CVD dE 23.1 (protan) / normal-vision dE 24.0   - PASS
+#   HORIZON trio on white, ALL pairs (the radar is a bubble chart, where any two
+#   marks can end up side by side, so every pair has to hold up, not just
+#   neighbours):
+#       worst CVD dE 13.0 (deutan) / normal-vision dE 16.3   - PASS
+#
+# The one warning the validator raises is that brand orange sits at 2.63:1
+# against a white background, under the 3:1 mark threshold. That is allowed only
+# when the value is also readable some other way, so every chart using it ships
+# direct labels or a table view underneath. Do not drop those.
+CAT = [
+    ORANGE,     # 1 - Orange Business brand
+    "#2A78D6",  # 2 - blue
+    "#1BAF7A",  # 3 - aqua
+    "#4A3AA7",  # 4 - violet
+    "#E87BA4",  # 5 - magenta
+]
+
+# Non-data ink: "no value", "not classified", a reference line. Deliberately
+# grey and deliberately NOT in CAT, so an unknown can never be mistaken for a
+# real category.
+NEUTRAL = "#8A8A8A"
+NEUTRAL_LIGHT = "#C9C9C9"
+
+# Sequential ramp, magnitude only (light = low, dark = high). Never use this to
+# colour a bar chart by the same value the bar length already shows.
 ORANGE_RAMP = ["#FFE3CC", "#FFC499", "#FFA566", "#FF8C33", "#FF7900", "#D06A00"]
 
-# Status is a workflow field on opportunity_spaces. The extraction pipeline does
-# not currently write it, so most rows come back NULL. STATUS_UNKNOWN is what
-# data.py substitutes so the app never has to deal with NaN.
+# Reserved status scale. Kept apart from CAT so a workflow state can never be
+# read as a data series, and always rendered with a word next to it, never as
+# colour alone.
 STATUS_UNKNOWN = "unclassified"
 STATUS_COLORS = {
-    "watchlist": "#B7B7B7",
-    "candidate": ORANGE_LIGHT,
-    "kept": ORANGE,
-    "active": ORANGE,
-    "rejected": "#8A8A8A",
-    "archived": "#4A4A4A",
-    STATUS_UNKNOWN: "#9E9E9E",
+    "Candidate": "#FAB219",   # warning  - looked at, not decided
+    "Validated": "#0CA30C",   # good     - kept
+    "Rejected": "#D03B3B",    # critical - dropped
+    "Watchlist": "#2A78D6",   # info     - parked, revisit
+    STATUS_UNKNOWN: NEUTRAL,
 }
 
 # ---------------------------------------------------------------------------
@@ -87,7 +129,22 @@ SCORE_MIN, SCORE_MAX = 0, 100
 HORIZON_NOW = 66
 HORIZON_NEXT = 33
 HORIZONS = ["Now", "Next", "Later"]
-HORIZON_COLORS = {"Now": ORANGE, "Next": ORANGE_LIGHT, "Later": "#B7B7B7"}
+
+# Three distinct hues rather than three tints of one. On the radar the ring
+# already carries the order, so hue is free to carry identity - which is what
+# makes a legend possible and what lets a reader pick the "Now" ring out of a
+# screenshot. Validated all-pairs (see the CAT note above).
+HORIZON_COLORS = {"Now": CAT[0], "Next": CAT[1], "Later": CAT[3]}
+
+# Signal type is nominal: four kinds of evidence with no natural order. It gets
+# categorical slots; anything unclassified gets neutral grey, never a slot.
+SIGNAL_TYPE_COLORS = {
+    "regulation": CAT[1],
+    "analyst_report": CAT[2],
+    "news": CAT[0],
+    "press_release": CAT[4],
+    "Unknown": NEUTRAL,
+}
 
 # ---------------------------------------------------------------------------
 # Source credibility tiers (mirrors source/source_registry.csv)
@@ -132,51 +189,69 @@ COLUMN_ALIASES = {
 }
 # Vertical grouping
 # ---------------------------------------------------------------------------
-# Raw vertical values from the data are granular ("Enterprise IT",
-# "Enterprise Security", ...). For filtering, several of these are variants
-# of the same broader category. This dict is the single place to adjust
-# that grouping — edit the lists below to reassign a vertical to a
-# different group, or add a new group entirely.
-VERTICAL_GROUPS: dict[str, list[str]] = {
-    "Enterprise": [
-        "Enterprise",
-        "Enterprise AI infrastructure",
-        "Enterprise IT",
-        "Enterprise Security",
-    ],
-    "Telecom & connectivity": [
-        "Cloud infrastructure",
-        "Fixed broadband",
-        "IoT connectivity",
-        "Telecom / Edge",
-        "Telecom Infrastructure",
-        "Telecommunications",
-        "Telecoms / Cloud",
-        "Telecoms regulation",
-    ],
-    "Manufacturing": [
-        "Manufacturing",
-    ],
-    "Public sector": [
-        "Public sector",
-    ],
-}
+# Neither the collection agent nor the opportunity-space agent constrains the
+# vertical it writes. `signals.targeted_vertical` currently holds 132 distinct
+# strings across 619 rows, and `opportunity_spaces.vertical` is free text with a
+# "2-6 words" instruction and nothing else. So the same industry arrives as
+# "Industry", "Industry & Manufacturing", "Manufacturing / Industry" and
+# "Manufacturing & Energy" depending on which prompt version was running.
+#
+# The real fix belongs upstream, in the prompt: give the agent a closed list and
+# make it pick from it. Until that happens this map is the containment layer,
+# and it has to be checked against the DATA, not written from memory - the
+# previous version listed values such as "Enterprise IT" and "Cloud
+# infrastructure" that appear in neither table, and so pushed five of the seven
+# real opportunity verticals into "Other".
+#
+# Keys below are matched case-insensitively as substrings, which is what lets one
+# entry absorb a family of near-identical labels instead of needing a line per
+# spelling. Order matters: the first matching pattern wins.
+VERTICAL_GROUP_PATTERNS: list[tuple[str, list[str]]] = [
+    # Checked before "Industry" so "Industry & Manufacturing" does not swallow
+    # a logistics signal that also says industry.
+    ("Logistics & transport", ["port", "logistic", "transport", "supply chain",
+                               "automotive", "mobility"]),
+    ("Public sector & defence", ["public sector", "public serv", "government",
+                                 "defense", "defence", "health"]),
+    ("Finance & insurance", ["financ", "insurance", "bank", "fintech"]),
+    ("Retail & FMCG", ["retail", "fmcg", "consumer", "customer experience",
+                       "grocery", "food"]),
+    # Before "Energy", so "Manufacturing & Energy" groups on its leading noun.
+    ("Industry & manufacturing", ["industr", "manufactur"]),
+    ("Energy & utilities", ["energy", "utilit"]),
+    ("Telecom & connectivity", ["telecom", "network", "fiber", "fibre",
+                                "broadband", "connectivity", "5g", "edge"]),
+    ("IT services & cloud", ["it services", "it and services", "cloud",
+                             "enterprise it", "data cent", "software",
+                             "ai infrastructure", "cyber", "security"]),
+]
+
+VERTICAL_GROUP_FALLBACK = "Other"
 
 
-def vertical_group_map() -> dict[str, str]:
-    """Map each raw vertical value to its group label.
+def vertical_group(value) -> str:
+    """Collapse one raw vertical string into a coarse, stable group label."""
+    if value is None:
+        return VERTICAL_GROUP_FALLBACK
+    text = str(value).strip().lower()
+    if not text or text in {"nan", "none", "unknown"}:
+        return VERTICAL_GROUP_FALLBACK
+    for group, patterns in VERTICAL_GROUP_PATTERNS:
+        if any(pattern in text for pattern in patterns):
+            return group
+    return VERTICAL_GROUP_FALLBACK
 
-    Any vertical value present in the data but not listed above falls back
-    to "Other" at lookup time, so a new vertical appearing in a future data
-    refresh doesn't silently disappear from the filters — it just shows up
-    ungrouped until someone adds it to VERTICAL_GROUPS.
+
+def vertical_group_map(values) -> dict[str, str]:
+    """Map every raw vertical present in `values` to its group label.
+
+    Built from the data rather than from a hard-coded vocabulary, so a vertical
+    the agent invents on the next run still lands somewhere - in its matching
+    group if the wording is recognisable, in "Other" if it is genuinely new.
     """
-    return {
-        value: group
-        for group, values in VERTICAL_GROUPS.items()
-        for value in values
-    }
-    
+    return {value: vertical_group(value) for value in set(values)}
+
+
 STATUS_DISPLAY_TO_STORED = {
     "Candidate": "candidate",
     "Validated": "kept",
