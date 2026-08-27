@@ -63,26 +63,49 @@ def render(data: dict, df) -> None:
     # --------------------------------------------------- volume over time
     st.markdown("### Signal volume over time")
     if "publication_month" in view.columns:
+        # Stacked by signal type rather than one flat orange area. The total is
+        # unchanged, but the composition is the more useful question: a rising
+        # line made only of press releases means something different from one
+        # made of regulator filings, and evidence_quality scores that difference.
+        # It is also the one chart on this page where colour has real identity
+        # work to do.
         by_month = (
             view.dropna(subset=["publication_date"])
-            .groupby("publication_month").size()
+            .groupby(["publication_month", "signal_type"]).size()
             .reset_index(name="signals").sort_values("publication_month")
         )
-        fig = px.area(by_month, x="publication_month", y="signals", markers=True)
-        fig.update_traces(
-            line=dict(color=C.ORANGE, width=2),
-            fillcolor="rgba(255,121,0,0.18)",
-            marker=dict(size=8, color=C.ORANGE, line=dict(width=2, color=C.WHITE)),
-            hovertemplate="%{x}<br>%{y} signals<extra></extra>",
+        present = set(by_month["signal_type"])
+        order = [t for t in C.SIGNAL_TYPE_COLORS if t in present]
+        fig = px.area(
+            by_month, x="publication_month", y="signals",
+            color="signal_type",
+            category_orders={"signal_type": order},
+            color_discrete_map=C.SIGNAL_TYPE_COLORS,
         )
-        fig.update_layout(height=320, hovermode="x unified")
+        # px.area derives each band's fillcolor from its line colour, so setting
+        # the line to white in a blanket update_traces() turns every fill white
+        # and the chart renders blank. Pin the fill explicitly first, then the
+        # white separator line on top of it.
+        def _band(trace):
+            hex_color = C.SIGNAL_TYPE_COLORS.get(trace.name, C.NEUTRAL)
+            r, g, b = (int(hex_color[i:i + 2], 16) for i in (1, 3, 5))
+            trace.update(
+                fillcolor=f"rgba({r},{g},{b},0.85)",
+                # 2px surface line between stacked fills, so adjacent bands stay
+                # separable without leaning on hue alone.
+                line=dict(width=2, color=C.WHITE),
+                hovertemplate="%{y} signals<extra>%{fullData.name}</extra>",
+            )
+
+        fig.for_each_trace(_band)
+        fig.update_layout(height=340, hovermode="x unified", legend_title_text="")
         theme.style_axes(fig, y_title="Signals published", x_title="Month")
         st.plotly_chart(fig, use_container_width=True)
         st.caption(
-            "By publication date, not collection date. The shape is partly a "
-            "property of the agent's search prompt, which favours 2024-2026 and "
-            "weights 2026 most heavily, so this is not an unbiased measure of "
-            "how much the world published."
+            "By publication date, not collection date, and stacked by evidence "
+            "type. The shape is partly a property of the agent's search prompt, "
+            "which favours 2024-2026 and weights 2026 most heavily, so this is "
+            "not an unbiased measure of how much the world published."
         )
 
     # ------------------------------------------------- Belgium vs the world
@@ -94,17 +117,20 @@ def render(data: dict, df) -> None:
             view.groupby("country").size().reset_index(name="signals")
             .sort_values("signals", ascending=True).tail(12)
         )
+        # One series: bar length already encodes the count, so colouring by the
+        # same number spends the identity channel restating it. Flat brand
+        # colour, value labelled directly.
         fig2 = px.bar(
-            by_country, x="signals", y="country", orientation="h",
-            color="signals", color_continuous_scale=C.ORANGE_RAMP, text="signals",
+            by_country, x="signals", y="country", orientation="h", text="signals",
         )
         fig2.update_traces(
             textposition="outside",
             textfont=dict(color=C.GREY_DARK, size=11),
-            marker=dict(cornerradius=4, line=dict(width=2, color=C.WHITE)),
+            marker=dict(color=C.CAT[0], cornerradius=4,
+                        line=dict(width=2, color=C.WHITE)),
             hovertemplate="<b>%{y}</b><br>%{x} signals<extra></extra>",
         )
-        fig2.update_layout(height=380, coloraxis_showscale=False, showlegend=False)
+        fig2.update_layout(height=380, showlegend=False)
         theme.style_axes(fig2, x_title="Signals")
         fig2.update_yaxes(title_text="")
         st.plotly_chart(fig2, use_container_width=True)
@@ -117,15 +143,19 @@ def render(data: dict, df) -> None:
             "scope": ["Belgium", "Rest of world"],
             "signals": [belgium, rest],
         })
+        # Two named scopes, not a magnitude ramp: these are identities, so they
+        # take categorical slots.
         fig3 = px.bar(split, x="scope", y="signals", text="signals",
-                      color="signals", color_continuous_scale=C.ORANGE_RAMP)
+                      color="scope",
+                      color_discrete_map={"Belgium": C.CAT[0],
+                                          "Rest of world": C.CAT[1]})
         fig3.update_traces(
             textposition="outside",
             textfont=dict(color=C.GREY_DARK, size=12),
             marker=dict(cornerradius=4, line=dict(width=2, color=C.WHITE)),
             hovertemplate="<b>%{x}</b><br>%{y} signals<extra></extra>",
         )
-        fig3.update_layout(height=380, coloraxis_showscale=False, showlegend=False)
+        fig3.update_layout(height=380, showlegend=False)
         theme.style_axes(fig3, y_title="Signals")
         fig3.update_xaxes(title_text="")
         st.plotly_chart(fig3, use_container_width=True)
@@ -143,15 +173,19 @@ def render(data: dict, df) -> None:
         if "signal_type" in view.columns:
             by_type = (view.groupby("signal_type").size()
                        .reset_index(name="signals").sort_values("signals"))
+            # Coloured by the type itself, using exactly the map the stacked
+            # area chart above uses — so "regulation" is the same blue in both
+            # places and a reader can carry the legend between them.
             fig4 = px.bar(by_type, x="signals", y="signal_type", orientation="h",
-                          color="signals", color_continuous_scale=C.ORANGE_RAMP,
+                          color="signal_type",
+                          color_discrete_map=C.SIGNAL_TYPE_COLORS,
                           text="signals")
             fig4.update_traces(
                 textposition="outside", textfont=dict(color=C.GREY_DARK, size=11),
                 marker=dict(cornerradius=4, line=dict(width=2, color=C.WHITE)),
                 hovertemplate="<b>%{y}</b><br>%{x} signals<extra></extra>",
             )
-            fig4.update_layout(height=320, coloraxis_showscale=False)
+            fig4.update_layout(height=320, showlegend=False)
             theme.style_axes(fig4, x_title="Signals")
             fig4.update_yaxes(title_text="")
             st.plotly_chart(fig4, use_container_width=True)
@@ -165,14 +199,14 @@ def render(data: dict, df) -> None:
                      .reset_index(name="signals")
                      .sort_values("signals", ascending=True).tail(12))
         fig5 = px.bar(by_source, x="signals", y="source_name", orientation="h",
-                      color="signals", color_continuous_scale=C.ORANGE_RAMP,
                       text="signals")
         fig5.update_traces(
             textposition="outside", textfont=dict(color=C.GREY_DARK, size=11),
-            marker=dict(cornerradius=4, line=dict(width=2, color=C.WHITE)),
+            marker=dict(color=C.CAT[0], cornerradius=4,
+                        line=dict(width=2, color=C.WHITE)),
             hovertemplate="<b>%{y}</b><br>%{x} signals<extra></extra>",
         )
-        fig5.update_layout(height=320, coloraxis_showscale=False)
+        fig5.update_layout(height=320, showlegend=False)
         theme.style_axes(fig5, x_title="Signals")
         fig5.update_yaxes(title_text="")
         st.plotly_chart(fig5, use_container_width=True)

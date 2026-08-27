@@ -1,21 +1,38 @@
 """Orange Business styling and one shared Plotly layout.
 
-Colour strategy, decided deliberately:
+Colour strategy
+---------------
+The previous version of this file argued for using **no categorical palette at
+all** - every chart a single-hue orange ramp - on the grounds that one hue read
+by lightness is always safe under colour-vision deficiency. That reasoning is
+right about lightness and wrong about everything else, and the app showed it:
 
-The app uses **no categorical colour palette at all**. Every chart is either a
-single-hue sequential ramp (magnitude), one flat orange (a single series), or
-recessive grey (grid, axes, non-data ink). Two reasons:
+* On the radar, colour and size both encoded ``attractiveness_score``. The seven
+  stored scores span 48.8 to 76.1 but the ramp was stretched over 0 to 100, so
+  every bubble came out the same mid-orange and the colour bar spent half its
+  length on a range containing no data. Two encoding channels, no readable
+  variation from either.
+* On every bar chart ``color=`` was set to the same column as the bar length, so
+  colour restated what position already said. The identity channel was spent,
+  and the charts still could not tell a regulator from a press release.
+* ``opportunities.py`` already had to break the rule to ship its comparison
+  chart, hard-coding three hues locally with a comment explaining that the
+  single-orange template "collapses to near-identical shades". When a rule needs
+  a local exception before a feature works, the rule is the problem.
 
-1. The obvious categorical field, ``status``, is NULL on every row the pipeline
-   writes, so colouring by it produces one flat grey chart that looks broken.
-2. A single-hue ramp is read by lightness, which means it stays legible under
-   every form of colour-vision deficiency and in greyscale print without
-   needing a validated multi-hue palette. The ramp in config.ORANGE_RAMP was
-   checked for monotonic lightness steps.
+So colour now does exactly one job per chart, and the four jobs live in
+``config``:
 
-Where a chart needs to distinguish two kinds of thing (code-computed versus
-LLM-judged sub-scores), that distinction is carried by a **text label and an
-icon**, never by colour alone.
+    identity  -> ``config.CAT``            fixed order, brand orange in slot 1
+    magnitude -> ``config.ORANGE_RAMP``    one hue, and only where nothing else
+                                           already encodes that same number
+    state     -> ``config.STATUS_COLORS``  reserved, always shown with its word
+    no value  -> ``config.NEUTRAL``        grey, never a categorical slot
+
+The palette was validated rather than eyeballed - ``config.py`` records the
+measured colour-vision and normal-vision separations. Brand orange sits below
+the 3:1 contrast mark on white, which is only allowed when the number is legible
+another way, so every chart using it carries direct labels and a table view.
 """
 
 from __future__ import annotations
@@ -109,10 +126,17 @@ def register_plotly_template() -> None:
         ),
         paper_bgcolor=C.WHITE,
         plot_bgcolor=C.WHITE,
-        colorway=[C.ORANGE],           # single series default
+        # The full categorical order, not a single colour. A one-series chart
+        # still comes out brand orange because that is slot 1; a multi-series
+        # chart now gets distinguishable hues instead of five shades of orange.
+        colorway=C.CAT,
         margin=dict(t=48, b=40, l=48, r=24),
         xaxis=dict(showgrid=False, linecolor=C.GREY_BORDER),
         yaxis=dict(showgrid=True, gridcolor=C.GREY_BORDER, zeroline=False),
+        legend=dict(
+            orientation="h", yanchor="bottom", y=1.02,
+            xanchor="left", x=0, title_text="",
+        ),
     )
     pio.templates["orange_business"] = template
     pio.templates.default = "plotly_white+orange_business"

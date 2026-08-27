@@ -39,12 +39,13 @@ COMPARE_COMPONENTS = [
 
 MAX_COMPARE = 3
 
-# Explicit, visually distinct colors for the comparison radar chart. The
-# app's global Plotly template (theme.register_plotly_template()) is built
-# around a single orange brand color, so px.line_polar's default discrete
-# color sequence collapses to near-identical shades — this overrides that
-# per-chart so 2-3 overlaid traces stay distinguishable.
-COMPARE_COLORS = ["#FF7900", "#2E86AB", "#4C956C"]
+# The first three categorical slots. These used to be hard-coded here, because
+# the old global template set colorway=[ORANGE] and px.line_polar's discrete
+# sequence therefore collapsed to near-identical shades. The template now
+# carries the whole validated order, so this is just a pointer to it — and the
+# first three slots are exactly the set that clears the all-pairs colour-vision
+# check, which is the right bar for overlaid shapes that touch each other.
+COMPARE_COLORS = C.CAT[:3]
 
 
 def _opportunity_label(row) -> str:
@@ -104,11 +105,15 @@ def _render_filters(df):
 
     version = st.session_state.get("filters_version", 0)
 
-    group_map = C.vertical_group_map()
     has_vertical = "vertical" in df.columns
 
     if has_vertical:
-        filtered["vertical_group"] = filtered["vertical"].map(group_map).fillna("Other")
+        # Built from the values actually present, not from a fixed vocabulary.
+        # The old hard-coded VERTICAL_GROUPS listed verticals ("Enterprise IT",
+        # "Cloud infrastructure", ...) that appear in neither table, so five of
+        # the seven real opportunity verticals fell through to "Other" and the
+        # filter was close to useless.
+        filtered["vertical_group"] = [C.vertical_group(v) for v in filtered["vertical"]]
 
     filter_specs = []
     if has_vertical:
@@ -294,9 +299,12 @@ def _render_summary_cards(subset, available_components) -> None:
             st.caption(row["name"])
             st.metric("Attractiveness", f"{attractiveness:.1f}" if pd.notna(attractiveness) else "—")
 
+            # _clean_text, not str(): str(nan) is the four-character string
+            # "nan", which is truthy, so a missing vertical used to render as a
+            # literal "nan" on the card.
             meta_bits = [
-                str(row.get("vertical", "")) or None,
-                str(row.get("time_horizon", "")) or None,
+                _clean_text(row.get("vertical")),
+                _clean_text(row.get("time_horizon")),
             ]
             meta_bits = [b for b in meta_bits if b]
             if meta_bits:
@@ -475,14 +483,16 @@ def render(data: dict, df) -> None:
         key="compare_mode",
     )
 
+    # One series, one colour. The previous version passed color=sort_col with a
+    # sequential ramp, so the shade of each bar restated the number its LENGTH
+    # already showed — the colour channel spent on nothing, plus a colour bar
+    # that had to be switched off again with coloraxis_showscale=False. Position
+    # is the strongest encoding there is; let it do the work alone.
     fig = px.bar(
         ranked_sorted,
         x=sort_col,
         y="name",
         orientation="h",
-        color=sort_col,
-        color_continuous_scale=C.ORANGE_RAMP,
-        range_color=(C.SCORE_MIN, C.SCORE_MAX),
         text=sort_col,
         custom_data=["id"],  # carried through so a click resolves back to a row
     )
@@ -491,6 +501,7 @@ def render(data: dict, df) -> None:
         textposition="outside",
         textfont=dict(color=C.GREY_DARK, size=12),
         marker=dict(
+            color=C.CAT[0],
             cornerradius=4,                                  # rounded data-end
             line=dict(width=2, color=C.WHITE),               # 2px surface gap
         ),
@@ -499,8 +510,9 @@ def render(data: dict, df) -> None:
     fig.update_layout(
         height=max(320, 46 * len(ranked)),
         showlegend=False,
-        coloraxis_showscale=False,
-        xaxis_range=[0, 100],
+        # Headroom for the outside value labels, which would otherwise be
+        # clipped on a bar sitting near 100.
+        xaxis_range=[0, 108],
     )
     theme.style_axes(fig, x_title=f"{sort_label} (0-100)")
     fig.update_yaxes(title_text="")

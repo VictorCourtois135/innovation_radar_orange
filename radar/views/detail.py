@@ -9,7 +9,7 @@ and the supporting signals.
 from __future__ import annotations
 
 import pandas as pd
-import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 
 from radar import config as C
@@ -93,6 +93,26 @@ def _stored_components(row: pd.Series) -> pd.DataFrame:
         )
 
     return pd.DataFrame(records)
+
+
+def _portfolio_average(df: pd.DataFrame, columns: list[str]) -> list[float] | None:
+    """Mean of each component across every opportunity currently in view.
+
+    Returns None when there is nothing to compare against — a single row, or no
+    numeric values — so the detail chart quietly drops the reference ring rather
+    than drawing a line identical to the one in front of it.
+    """
+    if df is None or len(df) < 2:
+        return None
+    values: list[float] = []
+    for column in columns:
+        if column not in df.columns:
+            return None
+        series = pd.to_numeric(df[column], errors="coerce").dropna()
+        if series.empty:
+            return None
+        values.append(float(series.mean()))
+    return values
 
 
 def _render_status_control(data: dict, row: pd.Series) -> None:
@@ -210,10 +230,17 @@ def render(data: dict, df: pd.DataFrame) -> None:
     # ---------------------------------------------------------------- header
     horizon = row.get("time_horizon", "Later")
 
+    horizon_color = C.HORIZON_COLORS.get(str(horizon), C.NEUTRAL)
+    status_label = str(row.get("status", C.STATUS_UNKNOWN))
+    status_color = C.STATUS_COLORS.get(status_label, C.NEUTRAL)
+
     st.markdown(
         f"""
         <div class="obx-card">
-            <span class="obx-pill">{str(horizon).upper()} HORIZON</span>
+            <span class="obx-pill" style="background-color:{horizon_color}">
+                {str(horizon).upper()} HORIZON</span>
+            <span class="obx-pill" style="background-color:{status_color}">
+                {status_label.upper()}</span>
             <span class="obx-pill obx-pill-muted">{row['code']}</span>
             <h3>{row['name']}</h3>
             <p style="color:{C.GREY_MED};margin:0">
@@ -309,25 +336,52 @@ def render(data: dict, df: pd.DataFrame) -> None:
         if available_components.empty:
             st.info("No stored component scores are available for this opportunity.")
         else:
-            radar_figure = px.line_polar(
-                available_components,
-                r="score",
-                theta="short",
-                line_close=True,
-                range_r=[0, 100],
-            )
+            # A five-axis shape on its own tells you almost nothing: 54 on
+            # evidence quality is only meaningful next to what the other
+            # opportunities score. So the portfolio average is drawn behind it as
+            # a neutral dashed reference. Grey and dashed on purpose — it is not
+            # a second series competing for attention, and the dash means the
+            # two are distinguishable without relying on colour.
+            radar_figure = go.Figure()
 
-            radar_figure.update_traces(
-                fill="toself",
-                line=dict(color=C.ORANGE, width=3),
-                fillcolor="rgba(255,121,0,0.28)",
-                hovertemplate="%{theta}<br>%{r:.1f} / 100<extra></extra>",
+            baseline = _portfolio_average(df, available_components["column"].tolist())
+            if baseline is not None:
+                radar_figure.add_trace(
+                    go.Scatterpolar(
+                        r=list(baseline) + [baseline[0]],
+                        theta=list(available_components["short"])
+                        + [available_components["short"].iloc[0]],
+                        name=f"Average of all {len(df)}",
+                        mode="lines",
+                        line=dict(color=C.NEUTRAL, width=2, dash="dot"),
+                        fill="toself",
+                        fillcolor="rgba(138,138,138,0.10)",
+                        hovertemplate="%{theta}<br>portfolio average %{r:.1f}<extra></extra>",
+                    )
+                )
+
+            scores = list(available_components["score"])
+            labels = list(available_components["short"])
+            radar_figure.add_trace(
+                go.Scatterpolar(
+                    r=scores + scores[:1],
+                    theta=labels + labels[:1],
+                    name=str(row["code"]),
+                    mode="lines+markers",
+                    line=dict(color=C.CAT[0], width=3),
+                    marker=dict(size=8, color=C.CAT[0],
+                                line=dict(width=2, color=C.WHITE)),
+                    fill="toself",
+                    fillcolor="rgba(255,121,0,0.22)",
+                    hovertemplate="%{theta}<br>%{r:.1f} / 100<extra></extra>",
+                )
             )
 
             radar_figure.update_polars(
                 radialaxis=dict(
+                    range=[0, 100],
                     gridcolor=C.GREY_BORDER,
-                    tickfont=dict(size=11),
+                    tickfont=dict(size=11, color=C.GREY_MED),
                 ),
                 angularaxis=dict(
                     gridcolor=C.GREY_BORDER,
@@ -337,15 +391,21 @@ def render(data: dict, df: pd.DataFrame) -> None:
             )
 
             radar_figure.update_layout(
-                height=700,
-                margin=dict(t=50, b=40, l=70, r=70),
+                # Was 700px inside a narrow right-hand column, which pushed the
+                # chart most of a screen below the score it belongs to.
+                height=380,
+                margin=dict(t=56, b=30, l=60, r=60),
                 paper_bgcolor=C.WHITE,
+                showlegend=True,
+                legend=dict(orientation="h", yanchor="bottom", y=1.06,
+                            xanchor="center", x=0.5, title_text=""),
             )
 
             st.plotly_chart(radar_figure, width="stretch")
             st.caption(
-                "The five component scores as stored in Azure SQL. "
-                "They are displayed here without recalculation."
+                "The five component scores as stored in Azure SQL, against the "
+                "average across every opportunity currently in view. Nothing is "
+                "recalculated here."
             )
 
     # -------------------------------------------------- stored score inputs
