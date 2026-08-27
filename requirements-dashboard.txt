@@ -1,0 +1,16 @@
+# Dashboard-only dependencies.
+#
+# These four are everything `streamlit run app.py` needs to run against the
+# committed CSV snapshot in data/. No Azure SDK, no pyodbc, no native builds.
+#
+# Use this when you just want to see or demo the dashboard:
+#     pip install -r requirements-dashboard.txt
+#
+# Use the full requirements.txt when you also need to run the pipeline
+# (scripts/run_agent_and_save.py, opportunity_spaces.py, export_snapshot.py)
+# or read live data from Azure SQL, which is what pyodbc is for.
+
+streamlit>=1.35
+pandas>=2.0
+numpy>=1.24
+plotly>=5.20

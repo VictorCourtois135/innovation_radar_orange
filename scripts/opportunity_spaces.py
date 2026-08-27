@@ -11,7 +11,6 @@ scores.py module and source_registry.csv in the same folder.
 
 import os
 import json
-import csv
 import pyodbc
 from collections import defaultdict
 from difflib import SequenceMatcher
