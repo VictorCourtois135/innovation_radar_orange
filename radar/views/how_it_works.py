@@ -7,60 +7,164 @@ opportunity space, what is behind it". This page is that answer.
 """
 
 from __future__ import annotations
-
 import streamlit as st
-
 from radar import theme
 
-PIPELINE = """
-```
-  ┌──────────────────────────────────────────────────────────────┐
-  │ 1. COLLECTION AGENT        Azure AI Foundry + Bing grounding │
-  │    Searches independent regulators, trade press, competitor  │
-  │    coverage. Never an Orange-owned source. Returns strict    │
-  │    JSON only.                                                │
-  └───────────────────────────┬──────────────────────────────────┘
-                              │  one row per article
-  ┌───────────────────────────▼──────────────────────────────────┐
-  │ 2. signals TABLE           Azure SQL Database                │
-  │    Deduplicated on source_url, then on source_name + title.  │
-  │    Each summary embedded with text-embedding-3-large,        │
-  │    stored as VECTOR(1536).                                   │
-  └───────────────────────────┬──────────────────────────────────┘
-                              │  cosine similarity > 0.82
-  ┌───────────────────────────▼──────────────────────────────────┐
-  │ 3. CLUSTERING              pure SQL, union-find in Python    │
-  │    Groups of 3+ semantically related signals. A single       │
-  │    article never becomes an opportunity on its own.          │
-  └───────────────────────────┬──────────────────────────────────┘
-                              │
-  ┌───────────────────────────▼──────────────────────────────────┐
-  │ 4. CAPABILITY CHECK        skip logic                        │
-  │    Compared against Orange's deployed capabilities including │
-  │    geographic scope. Already sold here? Skipped, not scored. │
-  └───────────────────────────┬──────────────────────────────────┘
-                              │
-  ┌───────────────────────────▼──────────────────────────────────┐
-  │ 5. SCORING + EXTRACTION                                      │
-  │    4 components computed from data, 1 judged by the model.   │
-  │    Near-duplicate opportunities merged.                      │
-  └───────────────────────────┬──────────────────────────────────┘
-                              │
-  ┌───────────────────────────▼──────────────────────────────────┐
-  │ 6. opportunity_spaces TABLE  →  this dashboard                │
-  └──────────────────────────────────────────────────────────────┘
-```
-"""
+def render_visual_pipeline():
+    """Renders a modern visual representation of the backend data pipeline with a very light orange shade layout."""
+    
+    # Custom CSS to style modern VERY LIGHT ORANGE step cards and flow indicators
+    st.markdown("""
+        <style>
+        .pipeline-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            font-family: sans-serif;
+        }
+        .pipeline-card {
+            background-color: #FFF7ED; /* Ultra-light warm orange/cream tint */
+            border-left: 5px solid #EA580C; /* Vibrant deep orange accent edge */
+            border-radius: 8px;
+            padding: 20px;
+            margin: 10px 0;
+            width: 100%;
+            box-shadow: 0 4px 6px -1px rgba(234, 88, 12, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            border-top: 1px solid #FFEDD5;
+            border-right: 1px solid #FFEDD5;
+            border-bottom: 1px solid #FFEDD5;
+        }
+        .pipeline-header {
+            color: #431407; /* Ultra-dark warm brown/black for clean contrast */
+            font-weight: 700;
+            font-size: 1.15rem;
+            margin-bottom: 6px;
+        }
+        .pipeline-sub {
+            color: #9A3412; /* Rich rust-orange for subtitles */
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 8px;
+            font-weight: 700;
+        }
+        .pipeline-body {
+            color: #7C2D12; /* Deep warm brown for body text */
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+        .pipeline-arrow {
+            color: #C2410C; /* Warm orange arrows */
+            font-size: 1.5rem;
+            margin: 4px 0;
+            font-weight: bold;
+        }
+        .pipeline-badge {
+            background-color: #FFEDD5; /* Soft light orange badge background */
+            color: #9A3412; /* Deep orange text for contrast */
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-family: monospace;
+            font-weight: 700;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown('<div class="pipeline-container">', unsafe_allow_html=True)
+
+    # Step 1
+    st.markdown("""
+        <div class="pipeline-card">
+            <div class="pipeline-sub">Step 1 — Ingestion & Grounding</div>
+            <div class="pipeline-header">Collection Agent</div>
+            <div class="pipeline-body">
+                Searches independent regulators, trade press, and competitor coverage via 
+                <span class="pipeline-badge">Azure AI Foundry + Bing grounding</span>. 
+                Strictly isolates Orange-owned sources. Outputs structured JSON.
+            </div>
+        </div>
+        <div class="pipeline-arrow">↓ <span style="font-size:0.8rem; color:#9A3412; font-family:monospace;">one row per article</span></div>
+    """, unsafe_allow_html=True)
+
+    # Step 2
+    st.markdown("""
+        <div class="pipeline-card" style="border-left-color: #0284C7;">
+            <div class="pipeline-sub">Step 2 — Storage & Vectorization</div>
+            <div class="pipeline-header">Signals Processing Table</div>
+            <div class="pipeline-body">
+                Stored in <span class="pipeline-badge">Azure SQL Database</span>. Deduplicated 
+                rigorously on URL, then title. Article summaries are vectorized using 
+                <code>text-embedding-3-large</code> into a <span class="pipeline-badge">VECTOR(1536)</span> field.
+            </div>
+        </div>
+        <div class="pipeline-arrow">↓ <span style="font-size:0.8rem; color:#9A3412; font-family:monospace;">cosine similarity &gt; 0.82</span></div>
+    """, unsafe_allow_html=True)
+
+    # Step 3
+    st.markdown("""
+        <div class="pipeline-card" style="border-left-color: #059669;">
+            <div class="pipeline-sub">Step 3 — Algorithmic Grouping</div>
+            <div class="pipeline-header">Semantic Clustering</div>
+            <div class="pipeline-body">
+                Executed via pure SQL and a <span class="pipeline-badge">Python union-find</span> algorithm. 
+                Groups related signals. Requires <b>3+ articles</b> to proceed; single reports never become opportunities.
+            </div>
+        </div>
+        <div class="pipeline-arrow">↓</div>
+    """, unsafe_allow_html=True)
+
+    # Step 4
+    st.markdown("""
+        <div class="pipeline-card" style="border-left-color: #7C3AED;">
+            <div class="pipeline-sub">Step 4 — Portfolio Alignment</div>
+            <div class="pipeline-header">Capability & Geo Check</div>
+            <div class="pipeline-body">
+                Evaluated against Orange's deployed footprint. Existing European private-5G products are 
+                automatically skipped to ensure the engine acts as a <b>market-entry tool</b>, not a product catalog.
+            </div>
+        </div>
+        <div class="pipeline-arrow">↓</div>
+    """, unsafe_allow_html=True)
+
+    # Step 5
+    st.markdown("""
+        <div class="pipeline-card" style="border-left-color: #E11D48;">
+            <div class="pipeline-sub">Step 5 — Synthesis</div>
+            <div class="pipeline-header">Scoring & Extraction</div>
+            <div class="pipeline-body">
+                Computes 4 data-driven metrics and 1 qualitative model metric. Merges any near-duplicate 
+                opportunity fields before final delivery.
+            </div>
+        </div>
+        <div class="pipeline-arrow">↓</div>
+    """, unsafe_allow_html=True)
+
+    # Step 6
+    st.markdown("""
+        <div class="pipeline-card" style="border-left-color: #EA580C;">
+            <div class="pipeline-sub">Step 6 — UI Layer</div>
+            <div class="pipeline-header">Opportunity Spaces Table</div>
+            <div class="pipeline-body">
+                Feeds the final user-facing radar view dashboard with contextualized, traceable trends.
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
 
 
 def render(data: dict, df) -> None:
     theme.banner("How it works", "The pipeline behind the numbers, and what to be careful about")
 
     st.markdown("### From an article to an opportunity")
-    st.markdown(PIPELINE)
+    
+    # Modernized interactive visualization call
+    render_visual_pipeline()
 
     st.markdown("### The two ideas that make this more than a news feed")
-
     st.markdown(
         """
 **1. An opportunity needs corroboration, not a headline.**
@@ -85,6 +189,7 @@ flagging Orange's own product catalogue as opportunities.
     st.markdown("### Database schema")
     st.markdown(
         """
+
 | Table | What it holds |
 |---|---|
 | `signals` | One row per collected article. Source, title, publication date, country, summary, and the 1536-dimension embedding. |
@@ -131,15 +236,5 @@ flagging Orange's own product catalogue as opportunities.
 - **Country lives on signals, not on opportunities.** The markets shown for an
   opportunity are rolled up from its linked signals, so an opportunity backed by
   articles about three countries will list three.
-        """
-    )
-
-    st.markdown("### Built by")
-    st.markdown(
-        """
-BeCode AI and Data Science bootcamp, two-week project.
-
-Gunay Bayramova (team lead) · Victor Courtois (repo and tech lead) ·
-Mahalakshmi Palanivel (data architect) · Anna Diacofotaki (documentation)
         """
     )
