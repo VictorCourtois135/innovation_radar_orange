@@ -112,103 +112,51 @@ def render(data: dict, df) -> None:
     st.markdown("### Where the signals come from")
     g1, g2 = st.columns(2)
 
+    def _lollipop(data, cat_col, val_col, height, hover_label):
+        # Stem + dot instead of a filled bar: same ranking legibility, lighter
+        # ink. Stems drawn first as thin lines, dots layered on top as a
+        # scatter trace so the value label can sit inside/beside the marker.
+        import plotly.graph_objects as go
+
+        fig = go.Figure()
+        for _, row in data.iterrows():
+            fig.add_shape(
+                type="line",
+                x0=0, x1=row[val_col], y0=row[cat_col], y1=row[cat_col],
+                line=dict(color=C.GREY_LIGHT if hasattr(C, "GREY_LIGHT") else C.GREY_DARK,
+                           width=2),
+                layer="below",
+            )
+        fig.add_trace(go.Scatter(
+            x=data[val_col], y=data[cat_col],
+            mode="markers+text",
+            marker=dict(size=14, color=C.CAT[0],
+                        line=dict(width=2, color=C.WHITE)),
+            text=data[val_col], textposition="middle right",
+            textfont=dict(color=C.GREY_DARK, size=11),
+            hovertemplate=f"<b>%{{y}}</b><br>%{{x}} {hover_label}<extra></extra>",
+            showlegend=False,
+        ))
+        fig.update_layout(height=height, showlegend=False)
+        theme.style_axes(fig, x_title="Signals")
+        fig.update_yaxes(title_text="")
+        fig.update_xaxes(range=[0, data[val_col].max() * 1.2])
+        return fig
+
     with g1:
         by_country = (
             view.groupby("country").size().reset_index(name="signals")
             .sort_values("signals", ascending=True).tail(12)
         )
-        # One series: bar length already encodes the count, so colouring by the
-        # same number spends the identity channel restating it. Flat brand
-        # colour, value labelled directly.
-        fig2 = px.bar(
-            by_country, x="signals", y="country", orientation="h", text="signals",
-        )
-        fig2.update_traces(
-            textposition="outside",
-            textfont=dict(color=C.GREY_DARK, size=11),
-            marker=dict(color=C.CAT[0], cornerradius=4,
-                        line=dict(width=2, color=C.WHITE)),
-            hovertemplate="<b>%{y}</b><br>%{x} signals<extra></extra>",
-        )
-        fig2.update_layout(height=380, showlegend=False)
-        theme.style_axes(fig2, x_title="Signals")
-        fig2.update_yaxes(title_text="")
+        fig2 = _lollipop(by_country, "country", "signals", 380, "signals")
         st.plotly_chart(fig2, use_container_width=True)
         st.caption("Top 12 markets by signal count.")
 
     with g2:
-        belgium = int((view["country"].str.contains("Belgium", case=False, na=False)).sum())
-        rest = len(view) - belgium
-        split = pd.DataFrame({
-            "scope": ["Belgium", "Rest of world"],
-            "signals": [belgium, rest],
-        })
-        # Two named scopes, not a magnitude ramp: these are identities, so they
-        # take categorical slots.
-        fig3 = px.bar(split, x="scope", y="signals", text="signals",
-                      color="scope",
-                      color_discrete_map={"Belgium": C.CAT[0],
-                                          "Rest of world": C.CAT[1]})
-        fig3.update_traces(
-            textposition="outside",
-            textfont=dict(color=C.GREY_DARK, size=12),
-            marker=dict(cornerradius=4, line=dict(width=2, color=C.WHITE)),
-            hovertemplate="<b>%{x}</b><br>%{y} signals<extra></extra>",
-        )
-        fig3.update_layout(height=380, showlegend=False)
-        theme.style_axes(fig3, y_title="Signals")
-        fig3.update_xaxes(title_text="")
-        st.plotly_chart(fig3, use_container_width=True)
-        st.caption(
-            f"{belgium} Belgian, {rest} elsewhere. Orange Business is a global "
-            "operator, so a low Belgian share is not automatically a problem, "
-            "but the prompt does ask for BIPT/IBPT as a regional baseline."
-        )
-
-    # ------------------------------------------------------- type + sources
-    st.markdown("### Signal type and source mix")
-    h1, h2 = st.columns(2)
-
-    with h1:
-        if "signal_type" in view.columns:
-            by_type = (view.groupby("signal_type").size()
-                       .reset_index(name="signals").sort_values("signals"))
-            # Coloured by the type itself, using exactly the map the stacked
-            # area chart above uses — so "regulation" is the same blue in both
-            # places and a reader can carry the legend between them.
-            fig4 = px.bar(by_type, x="signals", y="signal_type", orientation="h",
-                          color="signal_type",
-                          color_discrete_map=C.SIGNAL_TYPE_COLORS,
-                          text="signals")
-            fig4.update_traces(
-                textposition="outside", textfont=dict(color=C.GREY_DARK, size=11),
-                marker=dict(cornerradius=4, line=dict(width=2, color=C.WHITE)),
-                hovertemplate="<b>%{y}</b><br>%{x} signals<extra></extra>",
-            )
-            fig4.update_layout(height=320, showlegend=False)
-            theme.style_axes(fig4, x_title="Signals")
-            fig4.update_yaxes(title_text="")
-            st.plotly_chart(fig4, use_container_width=True)
-            st.caption(
-                "Regulator and wire-service signals carry more weight in the "
-                "evidence quality score than company press releases."
-            )
-
-    with h2:
         by_source = (view.groupby("source_name").size()
                      .reset_index(name="signals")
                      .sort_values("signals", ascending=True).tail(12))
-        fig5 = px.bar(by_source, x="signals", y="source_name", orientation="h",
-                      text="signals")
-        fig5.update_traces(
-            textposition="outside", textfont=dict(color=C.GREY_DARK, size=11),
-            marker=dict(color=C.CAT[0], cornerradius=4,
-                        line=dict(width=2, color=C.WHITE)),
-            hovertemplate="<b>%{y}</b><br>%{x} signals<extra></extra>",
-        )
-        fig5.update_layout(height=320, showlegend=False)
-        theme.style_axes(fig5, x_title="Signals")
-        fig5.update_yaxes(title_text="")
+        fig5 = _lollipop(by_source, "source_name", "signals", 380, "signals")
         st.plotly_chart(fig5, use_container_width=True)
         st.caption("Top 12 publications. Concentration here lowers source diversity.")
 
