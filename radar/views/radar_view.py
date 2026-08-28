@@ -266,14 +266,19 @@ def _ring_backdrop(fig: go.Figure) -> None:
     Each band is drawn as an annulus: the outer edge anticlockwise, the inner
     edge back clockwise, closed with ``fill="toself"``. The innermost band
     (Now) is a plain filled circle since it has no inner edge to reverse.
+
+    Bands step from white (Now, most urgent) through light grey (Next) to a
+    slightly darker grey (Later), rather than zebra-striping — a steady
+    step outward reads as "further away" more directly than an
+    alternating pattern does.
     """
     outer = list(np.linspace(0, 360, 181))
     inner = outer[::-1]
 
     bands = [
-        (0.0, 1.0, "rgba(17,17,17,0.065)"),   # Now  — darker
-        (1.0, 2.0, "rgba(17,17,17,0.022)"),   # Next — lighter
-        (2.0, 3.0, "rgba(17,17,17,0.065)"),   # Later — darker again
+        (0.0, 1.0, "rgba(17,17,17,0.0)"),    # Now   — pure white
+        (1.0, 2.0, "rgba(17,17,17,0.06)"),   # Next  — light grey
+        (2.0, 3.0, "rgba(17,17,17,0.16)"),   # Later — clearly darker grey
     ]
 
     for low, high, fillcolor in bands:
