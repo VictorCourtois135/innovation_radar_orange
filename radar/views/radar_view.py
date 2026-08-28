@@ -173,7 +173,7 @@ def _ring_backdrop(fig: go.Figure) -> None:
 
 def render(data: dict, df) -> None:
     theme.banner(
-        "Find the opportunity before the competitor does",
+        "Discover verified opportunities across horizons",
         "Opportunity spaces by vertical (sector) and time horizon (ring)",
     )
 
