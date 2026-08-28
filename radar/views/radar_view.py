@@ -6,33 +6,33 @@ Encoding, and why
     radius = urgency, continuously — the ring boundaries are the same
              thresholds data.classify_horizon uses, so a bubble's distance from
              the centre means "how soon" both within a ring and across rings
-    hue    = the ring it lands in (Now / Next / Later), so it is nameable
+    ring   = the horizon it lands in (Now / Next / Later) — drawn as concentric
+             bands and named in annotations, not colour
+    colour = status (Candidate / Watchlist / Validated / Rejected), solid fill —
+             this is the one thing on the page a reader needs to separate at a
+             glance across the whole chart, so it gets the whole colour channel
     sector = vertical group
     size   = attractiveness score
     label  = the opportunity code, printed on every bubble
 
 What changed, and the measurement behind it
 -------------------------------------------
-The earlier version encoded ``attractiveness_score`` as **both** colour and
-size, and described that as deliberate redundancy. Redundant encoding is a real
-technique, but it only works when the variable actually varies across the range
-you give it. Here it did not:
+Colour used to encode time horizon, with status relegated to a thin marker
+border. Two problems with that:
 
-* the seven stored scores span **48.8 to 76.1**, while ``range_color`` was set to
-  ``(0, 100)`` - so every bubble landed in the same narrow band of the ramp and
-  came out the same mid-orange, with half the colour bar covering values no row
-  has;
-* Plotly sizes bubbles by area, so 48.8 against 76.1 is a radius ratio of 0.80 -
-  visually near-identical too.
+* horizon was already fully legible from ring position (radius) and from the
+  ring annotations/backdrop — colour was carrying the same information twice;
+* status — which the reader can't get from position at all — was squeezed into
+  a 3px outline, the weakest channel on the chart, on top of an already-busy
+  fill colour.
 
-Two channels, one variable, nothing readable from either. So colour has been
-moved to the one thing on this page a reader actually needs to separate at a
-glance - the horizon ring - and size has been given an explicit ``sizeref`` fitted
-to the data instead of the default, so the spread that does exist is visible.
-
-The number itself is no longer left to a colour bar: every bubble is labelled
-with its code, the hover carries the score, and the table below repeats it. That
-also satisfies the contrast relief the palette requires (see ``theme``).
+So the assignment has been swapped: fill colour is now status, solid (not just
+an outline), and horizon has been left to do its existing job through ring
+position alone. Because colour now varies *within* each horizon trace rather
+than being constant per trace, the horizon legend can no longer show a single
+correct swatch per entry — so horizon counts are shown as plain annotations
+instead, and a proper status legend is built from small dummy traces so each
+status gets its own correct-coloured swatch.
 
 Angular collisions
 ------------------
@@ -57,6 +57,25 @@ RING_BOUNDS = {"Now": (0.15, 0.95), "Next": (1.15, 1.95), "Later": (2.15, 2.95)}
 RING_MAX = 3.0
 TOP_LABEL_COUNT = 10
 
+# Solid fill colour per status. Keys are matched case-insensitively against the
+# "status" column; anything unmatched falls back to "unknown".
+STATUS_FILL_COLORS = {
+    "candidate": "#F5C518",   # yellow
+    "watchlist": "#3F1FF5",   # orange
+    "validated": "#2E9E4F",   # green
+    "rejected": "#D93B3B",    # red
+    "unknown": C.GREY_MED,
+}
+
+STATUS_LABELS = {
+    "candidate": "Candidate",
+    "watchlist": "Watchlist",
+    "validated": "Validated",
+    "rejected": "Rejected",
+    "unknown": "Unknown",
+}
+
+
 def _format_radar_label(value) -> str:
     """Split a technology label over two short lines."""
     words = str(value).strip().split()
@@ -73,11 +92,6 @@ def _format_radar_label(value) -> str:
 
 def _radius_for(row) -> float:
     """Radius from the actual urgency score, not from random jitter.
-
-    The first version scattered each bubble at a random radius inside its ring.
-    That looked like a placement decision but carried no information, and worse,
-    it *implied* one: a reader comparing two bubbles in the Next ring would take
-    the inner one for the more urgent, when the difference was a random draw.
 
     Urgency runs 0-100 and the ring boundaries are the same thresholds
     ``data.classify_horizon`` uses, so each ring's band maps straight onto its
@@ -101,6 +115,11 @@ def _radius_for(row) -> float:
     span = max(band_high - band_low, 1e-6)
     position = min(max((float(urgency) - band_low) / span, 0.0), 1.0)
     return high - position * (high - low)
+
+
+def _status_key(status) -> str:
+    key = str(status).strip().lower()
+    return key if key in STATUS_FILL_COLORS else "unknown"
 
 
 def _prepare(df: pd.DataFrame) -> pd.DataFrame:
@@ -148,27 +167,73 @@ def _prepare(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _ring_backdrop(fig: go.Figure) -> None:
-    """A faint band behind the middle ring, so the three zones read as zones.
+    """Alternating-contrast bands behind each ring, so Now/Next/Later read as
+    three distinct zones on sight, not just from the axis gridlines.
 
-    Drawn as an annulus: the outer edge anticlockwise, the inner edge back
-    clockwise, closed with ``fill="toself"``. Without the reversed inner arc the
-    fill would cross the centre and shade the Now ring too.
+    Colour no longer marks horizon (that channel now belongs to status), so
+    the zones need a non-hue cue instead: greyscale shade, stepped up and down
+    band to band (zebra-striping) rather than a single flat tint, since a
+    monotonic gradient would make Now and Later look like more/less of the
+    same thing rather than three separate zones.
+
+    Each band is drawn as an annulus: the outer edge anticlockwise, the inner
+    edge back clockwise, closed with ``fill="toself"``. The innermost band
+    (Now) is a plain filled circle since it has no inner edge to reverse.
     """
     outer = list(np.linspace(0, 360, 181))
     inner = outer[::-1]
-    low, high = 1.0, 2.0
-    fig.add_trace(
-        go.Scatterpolar(
-            r=[high] * len(outer) + [low] * len(inner),
-            theta=outer + inner,
-            mode="lines",
-            line=dict(width=0),
-            fill="toself",
-            fillcolor="rgba(17,17,17,0.028)",
-            hoverinfo="skip",
-            showlegend=False,
+
+    bands = [
+        (0.0, 1.0, "rgba(17,17,17,0.065)"),   # Now  — darker
+        (1.0, 2.0, "rgba(17,17,17,0.022)"),   # Next — lighter
+        (2.0, 3.0, "rgba(17,17,17,0.065)"),   # Later — darker again
+    ]
+
+    for low, high, fillcolor in bands:
+        if low == 0.0:
+            r = [high] * len(outer)
+            theta = outer
+        else:
+            r = [high] * len(outer) + [low] * len(inner)
+            theta = outer + inner
+        fig.add_trace(
+            go.Scatterpolar(
+                r=r,
+                theta=theta,
+                mode="lines",
+                line=dict(width=0),
+                fill="toself",
+                fillcolor=fillcolor,
+                hoverinfo="skip",
+                showlegend=False,
+            )
         )
-    )
+
+
+def _status_legend_traces(fig: go.Figure, present_statuses: set[str]) -> None:
+    """Dummy off-chart points so the legend shows a correct swatch per status.
+
+    Real traces are split by horizon (for the radius logic) and coloured by
+    status per-point, so Plotly has no single colour to put in the legend for
+    them and their own legend entries are switched off. These invisible points
+    exist purely to draw one correctly-coloured swatch per status that is
+    actually present in the data, in a fixed, readable order.
+    """
+    order = ["candidate", "watchlist", "validated", "rejected", "unknown"]
+    for key in order:
+        if key not in present_statuses:
+            continue
+        fig.add_trace(
+            go.Scatterpolar(
+                r=[None],
+                theta=[None],
+                mode="markers",
+                name=STATUS_LABELS[key],
+                marker=dict(size=12, color=STATUS_FILL_COLORS[key]),
+                showlegend=True,
+                hoverinfo="skip",
+            )
+        )
 
 
 def render(data: dict, df) -> None:
@@ -198,9 +263,10 @@ def render(data: dict, df) -> None:
 
     plot_df = _prepare(df)
     top_label_codes = set(
-    plot_df.nlargest(TOP_LABEL_COUNT, "attractiveness_score")["code"]
-)
+        plot_df.nlargest(TOP_LABEL_COUNT, "attractiveness_score")["code"]
+    )
     groups = sorted(plot_df["vertical_group"].unique())
+    present_statuses = {_status_key(s) for s in plot_df["status"].fillna(C.STATUS_UNKNOWN)}
 
     # Size: fit the reference to the data actually on screen rather than letting
     # Plotly pick one, so a 27-point spread in score is a visible spread in area.
@@ -226,6 +292,11 @@ def render(data: dict, df) -> None:
                 theta=subset["theta"],
                 mode="markers+text",
                 name=f"{horizon} ({len(subset)})",
+                # Horizon is now read from ring position + the ring annotations
+                # below, not from colour, so this trace's own legend entry would
+                # be misleading (its markers are multiple colours) and is
+                # switched off in favour of the status legend built separately.
+                showlegend=False,
                 text=[
                     _format_radar_label(technology) if code in top_label_codes else ""
                     for code, technology in zip(subset["code"], subset["technology"])
@@ -239,16 +310,12 @@ def render(data: dict, df) -> None:
                     # the Later ring is comparable to one in the Now ring.
                     sizeref=(2.0 * float(sized.max())) / (36.0 ** 2),
                     sizemin=8,
-                    color=C.HORIZON_COLORS[horizon],
-                    opacity=0.88,
-                    line=dict(width=3, color=[
-                        C.STATUS_COLORS.get(
-                            status,
-                            C.STATUS_COLORS[C.STATUS_UNKNOWN],
-                        )
+                    color=[
+                        STATUS_FILL_COLORS[_status_key(status)]
                         for status in subset["status"].fillna(C.STATUS_UNKNOWN)
                     ],
-                ),
+                    opacity=0.92,
+                    line=dict(width=1.5, color=C.WHITE),
                 ),
                 customdata=np.stack([
                     subset["name"].astype(str),
@@ -258,6 +325,7 @@ def render(data: dict, df) -> None:
                     scores.loc[subset.index].astype(float),
                     subset["vertical"].astype(str),
                     subset.get("countries", pd.Series("Unknown", index=subset.index)).astype(str),
+                    subset["status"].fillna(C.STATUS_UNKNOWN).astype(str),
                 ], axis=-1),
                 hovertemplate=(
                     "<b>%{customdata[0]}</b><br>"
@@ -265,11 +333,14 @@ def render(data: dict, df) -> None:
                     "Technology: %{customdata[2]}<br>"
                     "Use case: %{customdata[3]}<br>"
                     "Attractiveness: %{customdata[4]:.1f} / 100<br>"
+                    "Status: %{customdata[7]}<br>"
                     "Markets: %{customdata[6]}"
                     "<extra></extra>"
                 ),
             )
         )
+
+    _status_legend_traces(fig, present_statuses)
 
     step_deg = 360.0 / max(len(groups), 1)
     spokes = [index * step_deg for index in range(len(groups))]
@@ -278,12 +349,14 @@ def render(data: dict, df) -> None:
     # plotting area along one radius — they landed on top of the bubbles and,
     # rotated upright, read as broken text. They are drawn instead as plain
     # annotations on the emptiest half-sector, horizontal, so they sit in white
-    # space. The legend names the same three rings by colour, so this is a
-    # convenience label rather than the only route to the information.
+    # space. With colour no longer tied to horizon, these annotations (plus the
+    # ring boundaries themselves) are now the only source for horizon names —
+    # counts are appended here since the legend no longer carries them either.
     label_deg = (spokes[-1] + step_deg / 2.0) if spokes else 45.0
+    horizon_counts = plot_df["time_horizon"].value_counts().to_dict()
     ring_annotations = [
         dict(
-            text=horizon,
+            text=f"{horizon} ({horizon_counts.get(horizon, 0)})",
             showarrow=False,
             font=dict(size=11, color=C.GREY_MED),
             xref="paper", yref="paper",
@@ -322,7 +395,7 @@ def render(data: dict, df) -> None:
         showlegend=True,
         legend=dict(
             orientation="h", yanchor="top", y=1.0,
-            xanchor="center", x=0.5, title_text="Time horizon  ",
+            xanchor="center", x=0.5,
             font=dict(size=12),
         ),
         annotations=ring_annotations,
@@ -339,10 +412,11 @@ def render(data: dict, df) -> None:
         )
 
     st.caption(
-        "Ring and colour both = time horizon, inner and orange being the most "
-        "urgent. Sector = vertical group. Bubble size = attractiveness score, "
-        "and every bubble is labelled with its code — the exact numbers are in "
-        "the table below."
+        "Ring = time horizon (labelled on the chart), inner being most urgent. "
+        "Sector = vertical group. Colour = status — yellow candidate, orange "
+        "watchlist, green validated, red rejected. Bubble size = attractiveness "
+        "score, and every bubble is labelled with its code — the exact numbers "
+        "are in the table below."
     )
 
     if len(df) < 10:
@@ -358,7 +432,7 @@ def render(data: dict, df) -> None:
     with st.expander("Table view of the same data", expanded=True):
         table = plot_df.copy()
         cols = [c for c in ["code", "name", "vertical_group", "vertical", "technology",
-                            "time_horizon", "attractiveness_score",
+                            "time_horizon", "status", "attractiveness_score",
                             "total_articles", "distinct_sources", "countries"]
                 if c in table.columns]
         st.dataframe(
@@ -370,6 +444,7 @@ def render(data: dict, df) -> None:
                 "vertical_group": "Vertical group",
                 "vertical": "Vertical (as written by the agent)",
                 "time_horizon": "Horizon",
+                "status": "Status",
                 "attractiveness_score": st.column_config.ProgressColumn(
                     "Attractiveness", min_value=0, max_value=100, format="%.1f",
                 ),
