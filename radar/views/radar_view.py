@@ -61,7 +61,7 @@ TOP_LABEL_COUNT = 10
 # "status" column; anything unmatched falls back to "unknown".
 STATUS_FILL_COLORS = {
     "candidate": "#F5C518",   # yellow
-    "watchlist": "#3F1FF5",   # orange
+    "watchlist": "#4D1FF5",   # orange
     "validated": "#2E9E4F",   # green
     "rejected": "#D93B3B",    # red
     "unknown": C.GREY_MED,
@@ -210,32 +210,6 @@ def _ring_backdrop(fig: go.Figure) -> None:
         )
 
 
-def _status_legend_traces(fig: go.Figure, present_statuses: set[str]) -> None:
-    """Dummy off-chart points so the legend shows a correct swatch per status.
-
-    Real traces are split by horizon (for the radius logic) and coloured by
-    status per-point, so Plotly has no single colour to put in the legend for
-    them and their own legend entries are switched off. These invisible points
-    exist purely to draw one correctly-coloured swatch per status that is
-    actually present in the data, in a fixed, readable order.
-    """
-    order = ["candidate", "watchlist", "validated", "rejected", "unknown"]
-    for key in order:
-        if key not in present_statuses:
-            continue
-        fig.add_trace(
-            go.Scatterpolar(
-                r=[None],
-                theta=[None],
-                mode="markers",
-                name=STATUS_LABELS[key],
-                marker=dict(size=12, color=STATUS_FILL_COLORS[key]),
-                showlegend=True,
-                hoverinfo="skip",
-            )
-        )
-
-
 def render(data: dict, df) -> None:
     theme.banner(
         "Discover verified opportunities across horizons",
@@ -266,7 +240,6 @@ def render(data: dict, df) -> None:
         plot_df.nlargest(TOP_LABEL_COUNT, "attractiveness_score")["code"]
     )
     groups = sorted(plot_df["vertical_group"].unique())
-    present_statuses = {_status_key(s) for s in plot_df["status"].fillna(C.STATUS_UNKNOWN)}
 
     # Size: fit the reference to the data actually on screen rather than letting
     # Plotly pick one, so a 27-point spread in score is a visible spread in area.
@@ -281,8 +254,17 @@ def render(data: dict, df) -> None:
     fig = go.Figure()
     _ring_backdrop(fig)
 
-    for horizon in C.HORIZONS:
-        subset = plot_df[plot_df["time_horizon"] == horizon]
+    # One trace per status, not per horizon. Each trace now has a single solid
+    # colour, which is what lets the legend actually control the data: a click
+    # can isolate "only Rejected" because Rejected *is* a trace, rather than a
+    # colour scattered across three horizon-traces that all show/hide together.
+    # Ring position (radius) still comes from horizon via plot_df["r"], computed
+    # earlier — splitting by status here doesn't touch that.
+    status_order = ["candidate", "watchlist", "validated", "rejected", "unknown"]
+    plot_df["_status_key"] = plot_df["status"].fillna(C.STATUS_UNKNOWN).map(_status_key)
+
+    for key in status_order:
+        subset = plot_df[plot_df["_status_key"] == key]
         if subset.empty:
             continue
         subset_size = sized.loc[subset.index]
@@ -291,12 +273,8 @@ def render(data: dict, df) -> None:
                 r=subset["r"],
                 theta=subset["theta"],
                 mode="markers+text",
-                name=f"{horizon} ({len(subset)})",
-                # Horizon is now read from ring position + the ring annotations
-                # below, not from colour, so this trace's own legend entry would
-                # be misleading (its markers are multiple colours) and is
-                # switched off in favour of the status legend built separately.
-                showlegend=False,
+                name=STATUS_LABELS[key],
+                showlegend=True,
                 text=[
                     _format_radar_label(technology) if code in top_label_codes else ""
                     for code, technology in zip(subset["code"], subset["technology"])
@@ -306,14 +284,11 @@ def render(data: dict, df) -> None:
                 marker=dict(
                     size=subset_size,
                     sizemode="area",
-                    # One shared reference across all three traces, so a bubble in
-                    # the Later ring is comparable to one in the Now ring.
+                    # One shared reference across all five status traces, so a
+                    # bubble in one trace is comparable in area to any other.
                     sizeref=(2.0 * float(sized.max())) / (36.0 ** 2),
                     sizemin=8,
-                    color=[
-                        STATUS_FILL_COLORS[_status_key(status)]
-                        for status in subset["status"].fillna(C.STATUS_UNKNOWN)
-                    ],
+                    color=STATUS_FILL_COLORS[key],
                     opacity=0.92,
                     line=dict(width=1.5, color=C.WHITE),
                 ),
@@ -325,7 +300,7 @@ def render(data: dict, df) -> None:
                     scores.loc[subset.index].astype(float),
                     subset["vertical"].astype(str),
                     subset.get("countries", pd.Series("Unknown", index=subset.index)).astype(str),
-                    subset["status"].fillna(C.STATUS_UNKNOWN).astype(str),
+                    subset["time_horizon"].astype(str),
                 ], axis=-1),
                 hovertemplate=(
                     "<b>%{customdata[0]}</b><br>"
@@ -333,14 +308,12 @@ def render(data: dict, df) -> None:
                     "Technology: %{customdata[2]}<br>"
                     "Use case: %{customdata[3]}<br>"
                     "Attractiveness: %{customdata[4]:.1f} / 100<br>"
-                    "Status: %{customdata[7]}<br>"
+                    "Horizon: %{customdata[7]}<br>"
                     "Markets: %{customdata[6]}"
                     "<extra></extra>"
                 ),
             )
         )
-
-    _status_legend_traces(fig, present_statuses)
 
     step_deg = 360.0 / max(len(groups), 1)
     spokes = [index * step_deg for index in range(len(groups))]
@@ -398,6 +371,14 @@ def render(data: dict, df) -> None:
             xanchor="center", x=0.5,
             font=dict(size=12),
         ),
+        # Plotly's default is click=toggle-this-one, double-click=isolate.
+        # Swapped here so a single click on a status does what was asked —
+        # shows only that status's bubbles, hiding the rest — and a
+        # double-click on an already-isolated status switches it off on its
+        # own instead. Clicking any status again restores everyone (Plotly's
+        # native behaviour once nothing is isolated).
+        legend_itemclick="toggleothers",
+        legend_itemdoubleclick="toggle",
         annotations=ring_annotations,
         margin=dict(t=20, b=20, l=20, r=20),
     )
