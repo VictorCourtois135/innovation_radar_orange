@@ -33,9 +33,7 @@ We structure our Orange Business mission with the following objectives:
 2. Using a python script, we called the AI agent and stored the output into an SQL database hosted on Azure.
 3. We used a Microsoft foundry AI agent to create OS from Orange Business based on their areas of interest. 
 4. Using the above agent, we computed a score for each OS with the following considerations:
--
--
--
+
 Prompt can be viewed in "Prompts" folder.
 5. We used Streamlit to create an interactive web-based user interface (access through a local web browser). 
 
@@ -122,11 +120,11 @@ To feed seamlessly into downstream relational databases, automated innovation ra
 
 
 ## 💫 Top 5 unique features 
-top 5
+
 
 
 ## 🔍 Limitations and future outlooks
-At least 3
+
 
 
 ## 👽 Usage of AI and its importance
