@@ -40,6 +40,24 @@ Angular collisions
 spokes and a mostly empty circle. Bubbles are now placed on the coarse vertical
 *group*, and any two landing on the same spoke are fanned apart by a small,
 deterministic angular offset instead of drawing on top of each other.
+
+Label collisions
+-----------------
+Bubble text labels used a single fixed ``textposition="top center"`` for every
+labeled bubble. When two labeled bubbles land close together (common near the
+crowded inner rings), their text prints in the same place and merges into
+unreadable overlapping text. Labels are now staggered: for each labeled bubble
+we count how many *already-placed* labels sit within a proximity radius and
+rotate through a small set of textpositions (top / bottom / right / left of
+the marker) so nearby labels fan out instead of stacking.
+
+The ring annotations ("Now (17)", "Next (12)", "Later (1)") used to be placed
+at a single angle computed from the spoke layout, on the assumption that angle
+would be empty. That assumption doesn't hold once bubbles are angularly
+jittered to avoid collisions (see above), so the annotation could land right
+on top of a bubble's label. They're now anchored to a fixed spot outside the
+polar plotting area (top-right corner, in paper coordinates) so they can never
+overlap a data point regardless of how the bubbles are laid out.
 """
 
 from __future__ import annotations
@@ -56,6 +74,18 @@ from radar import theme
 RING_BOUNDS = {"Now": (0.15, 0.95), "Next": (1.15, 1.95), "Later": (2.15, 2.95)}
 RING_MAX = 3.0
 TOP_LABEL_COUNT = 10
+
+# Textpositions cycled through when two labeled bubbles land moderately close
+# together, so their text fans out around the marker instead of overlapping.
+LABEL_POSITION_CYCLE = ["top center", "bottom center", "middle right", "middle left"]
+# Below this cartesian distance (in polar r/theta-derived units), two labels
+# would still overlap regardless of textposition, so the lower-priority one is
+# dropped rather than rendered on top of the other.
+LABEL_DROP_THRESHOLD = 0.45
+# Between DROP and STAGGER, labels are kept but rotated through
+# LABEL_POSITION_CYCLE so they fan out instead of both defaulting to the same
+# "top center" spot.
+LABEL_STAGGER_THRESHOLD = 0.85
 
 # Solid fill colour per status. Keys are matched case-insensitively against the
 # "status" column; anything unmatched falls back to "unknown".
@@ -166,6 +196,63 @@ def _prepare(df: pd.DataFrame) -> pd.DataFrame:
     return plot_df
 
 
+def _assign_label_positions(plot_df: pd.DataFrame, labeled_codes: set) -> tuple[dict, set]:
+    """Place labels for the top-scoring bubbles without letting any two merge.
+
+    Rotating a label's textposition only helps when bubbles are moderately
+    apart — in a tight cluster (e.g. four candidate opportunities on
+    neighbouring spokes at a similar radius) the small set of textpositions
+    runs out and starts repeating, so two labels still land in the same spot
+    and merge into unreadable text.
+
+    So this does two things, processing candidates from highest
+    attractiveness score to lowest (so the most important label in a cluster
+    is the one that wins a spot):
+
+    * if a candidate lands within ``LABEL_DROP_THRESHOLD`` of an
+      already-placed, higher-priority label, no textposition would separate
+      them enough to read cleanly — its label is dropped rather than drawn
+      overlapping;
+    * otherwise, if it's still within ``LABEL_STAGGER_THRESHOLD``, it's kept
+      but rotated to the next entry in ``LABEL_POSITION_CYCLE`` so it fans out
+      away from its neighbour instead of defaulting to the same "top center".
+
+    Returns (textposition-by-code, set of codes whose label was dropped).
+    """
+    candidates = plot_df[plot_df["code"].isin(labeled_codes)].copy()
+    if candidates.empty:
+        return {}, set()
+
+    theta_rad = np.radians(candidates["theta"].to_numpy(dtype=float))
+    r = candidates["r"].to_numpy(dtype=float)
+    candidates["_x"] = r * np.cos(theta_rad)
+    candidates["_y"] = r * np.sin(theta_rad)
+
+    # Highest-priority label in a cluster wins the spot; lower-priority
+    # neighbours are the ones that get dropped or pushed aside.
+    candidates = candidates.sort_values("attractiveness_score", ascending=False)
+
+    positions: dict[str, str] = {}
+    dropped: set[str] = set()
+    placed_xy: list[tuple[float, float]] = []
+
+    for code, x, y in zip(candidates["code"], candidates["_x"], candidates["_y"]):
+        nearest = (
+            min(((x - px) ** 2 + (y - py) ** 2) ** 0.5 for px, py in placed_xy)
+            if placed_xy else float("inf")
+        )
+
+        if nearest < LABEL_DROP_THRESHOLD:
+            dropped.add(code)
+            continue
+
+        cycle_index = len(placed_xy) % len(LABEL_POSITION_CYCLE) if nearest < LABEL_STAGGER_THRESHOLD else 0
+        positions[code] = LABEL_POSITION_CYCLE[cycle_index]
+        placed_xy.append((x, y))
+
+    return positions, dropped
+
+
 def _ring_backdrop(fig: go.Figure) -> None:
     """Alternating-contrast bands behind each ring, so Now/Next/Later read as
     three distinct zones on sight, not just from the axis gridlines.
@@ -239,6 +326,7 @@ def render(data: dict, df) -> None:
     top_label_codes = set(
         plot_df.nlargest(TOP_LABEL_COUNT, "attractiveness_score")["code"]
     )
+    label_positions, dropped_label_codes = _assign_label_positions(plot_df, top_label_codes)
     groups = sorted(plot_df["vertical_group"].unique())
 
     # Size: fit the reference to the data actually on screen rather than letting
@@ -276,10 +364,18 @@ def render(data: dict, df) -> None:
                 name=STATUS_LABELS[key],
                 showlegend=True,
                 text=[
-                    _format_radar_label(technology) if code in top_label_codes else ""
+                    _format_radar_label(technology)
+                    if code in top_label_codes and code not in dropped_label_codes
+                    else ""
                     for code, technology in zip(subset["code"], subset["technology"])
                 ],
-                textposition="top center",
+                # Per-point textposition (not a single shared string) so
+                # labeled bubbles that sit close together fan their text out
+                # instead of printing on top of one another. See
+                # _assign_label_positions.
+                textposition=[
+                    label_positions.get(code, "top center") for code in subset["code"]
+                ],
                 textfont=dict(size=11, color=C.GREY_DARK),
                 marker=dict(
                     size=subset_size,
@@ -318,14 +414,16 @@ def render(data: dict, df) -> None:
     step_deg = 360.0 / max(len(groups), 1)
     spokes = [index * step_deg for index in range(len(groups))]
 
-    # Ring names used to be radial tick labels, which Plotly draws inside the
-    # plotting area along one radius — they landed on top of the bubbles and,
-    # rotated upright, read as broken text. They are drawn instead as plain
-    # annotations on the emptiest half-sector, horizontal, so they sit in white
-    # space. With colour no longer tied to horizon, these annotations (plus the
-    # ring boundaries themselves) are now the only source for horizon names —
-    # counts are appended here since the legend no longer carries them either.
-    label_deg = (spokes[-1] + step_deg / 2.0) if spokes else 45.0
+    # Ring names are drawn as plain annotations, not radial tick labels
+    # (Plotly draws those inside the plotting area along one radius, where
+    # they land on top of bubbles). They used to be placed at an angle chosen
+    # from spoke geometry alone, on the assumption that angle would be empty
+    # of bubbles — but bubbles are angularly jittered to avoid collisions
+    # (see _prepare), so that assumption can fail and the annotation can land
+    # on a bubble's label (as seen with "Later (1)" over a bubble). They're
+    # now anchored to a fixed corner in paper coordinates, stacked vertically,
+    # entirely outside the polar plotting area — so they can never overlap a
+    # data point regardless of the current layout.
     horizon_counts = plot_df["time_horizon"].value_counts().to_dict()
     ring_annotations = [
         dict(
@@ -333,10 +431,11 @@ def render(data: dict, df) -> None:
             showarrow=False,
             font=dict(size=11, color=C.GREY_MED),
             xref="paper", yref="paper",
-            x=0.5 + 0.5 * (radius / RING_MAX) * np.cos(np.radians(label_deg + 90)),
-            y=0.5 + 0.5 * (radius / RING_MAX) * np.sin(np.radians(label_deg + 90)),
+            xanchor="left", yanchor="top",
+            x=1.0,
+            y=0.98 - index * 0.035,
         )
-        for horizon, radius in zip(C.HORIZONS, (0.6, 1.6, 2.6))
+        for index, horizon in enumerate(C.HORIZONS)
     ]
 
     fig.update_polars(
@@ -359,7 +458,7 @@ def render(data: dict, df) -> None:
         ),
         bgcolor=C.WHITE,
         # Leave room around the circle so long sector names are not clipped.
-        domain=dict(x=[0.04, 0.96], y=[0.02, 0.94]),
+        domain=dict(x=[0.04, 0.90], y=[0.02, 0.94]),
     )
     fig.update_layout(
         height=1000,
@@ -380,7 +479,7 @@ def render(data: dict, df) -> None:
         legend_itemclick="toggleothers",
         legend_itemdoubleclick="toggle",
         annotations=ring_annotations,
-        margin=dict(t=20, b=20, l=20, r=20),
+        margin=dict(t=20, b=20, l=20, r=90),
     )
     st.plotly_chart(fig, use_container_width=True)
 
