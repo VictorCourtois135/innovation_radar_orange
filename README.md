@@ -40,13 +40,12 @@ d) for each space, an attractiveness score is calculated ("see below attractiven
 5. We used Streamlit to create an interactive web-based user interface (access through a local web browser; see below). 
 
 
----
 
 ## 🛕 Project architecture
 
 ![pipeline](assets/20260825_readme_images.png)
 
-*Schematic representation of our pipeline*
+*Fig1: Schematic representation of our pipeline*
 
 
 ## 🛠️ Tech stack 
@@ -100,9 +99,6 @@ The app should open automatically at `http://localhost:8501`.
 
 
 
----
-
-
 
 ## 📊 Standardized Data Output
 
@@ -110,14 +106,36 @@ The app should open automatically at `http://localhost:8501`.
 
 ###  1. Database structure
 ![](assets/db_schema.png)
-*We generated three tables: one containing the articles, one with the opportunity space and a table connecting the two*
+
+*Fig2: We generated three tables: one containing the articles, one with the opportunity space and a table connecting the two*
 
 
-### 2. Innovation radar app 
+### 2. Innovation radar 
 
+The application of the innovation radar opens as the following view: 
 
+![](assets/home_page.png)
 
+1. On the left, you can find the navigation sidebar where you can: 
+- move to different pages (radar, top opportunities etc.)
+- for each of these pages, you can have a view as the persona of interest: strategist, sales and presales, or all of them combined (i.e., everyone)
+- you can also apply different filters in the pages such as a vertical or technology of interest, the time you want to act on the OS of interest, or a minimum attractiveness score
+- the "live" icon indicates if you are connected to the Azure db; if credentials are missing, or the Azure firewall blocks the connection, or the db is unavailable, you will see a CSV snapshot. 
+- if you choose to update the db, you can refresh the app using the "refresh data" at the bottom
 
+2. On the main view of the each page, you can find the plots of interest with a detail explanation of graphs and their sources. 
+The screenshot above shows the "radar" page. You can see the radar depicted as concentric circles: 
+- the smaller the circle, the more priority to act on the OS has to be given
+- the lines intersecting the circles represent the verticals of interest
+- the bubles on the circles represent the OS that were identified. The smaller the bubble, the lower their attractiveness scores
+- the color of the bubles indicate the status of the OS: all OS are identified as "candidates" by our radar. Then, the user has the choice to classify them as: watchlist, validated or rejected. 
+- for  clarity, only the name of the top 10 OS are depicted on the radar.
+
+3. On the "Top opportunities" page, you can view the opportunities in detail. They are named as follows: 
+vertical x usecase x technology
+If you select one of them, the redirects you to the page "opportunity detail" where you can view in detail how the opportunity was obtained. 
+
+![](assets/top_opportunities.png)
 
 ## 💡 Attractiveness score for each OS 
 We computed a different scores (0 to 100)for each OS to determine how attractive it is for Orange Business based on the following criteria:
@@ -164,7 +182,7 @@ These scores were suggested by the client. In our app, we also give the power to
 2. The attractiveness score is computed by four metrics directly from the data we collected. Only the strategic relevance is an LLM judment call. Therefore, it is mostly a deterministic score. The weight of the LLM can also be nulled (see point 3) by the user.
 3. The final attractiveness score can be modified by customed weights by the user based on the signal of interest. 
 4. All signals that were used to generate the opportunity space are available (URLs). We also have a "capability check note" that documents what the LLM verified before it created the OS. 
-5. The user can classify an OS as "watchlist", "rejected" or "".
+5. The user can classify a "candidate" OS as "watchlist", "rejected" or "validated".
 
 
 
