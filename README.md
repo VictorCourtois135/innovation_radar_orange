@@ -76,15 +76,30 @@ Prompt can be viewed in "Prompts" folder.
 
 ## 💻 Installation 
 
+**1. Clone the repo** 
+```
+git clone https://github.com/VictorCourtois135/innovation_radar_orange.git
+cd innovation_radar_orange
+```
+
+**2. Create a virtual environment**
+```
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+**3. Install dependencies**
+``` 
+pip install -r requirements.txt
+``` 
 
 
-
-**Open user interface** : 
+**4. Open user interface** : 
 
 ``` 
 streamlit run app.py 
 ```
-
+The app should open automatically at `http://localhost:8501`.
 
 
 
@@ -116,7 +131,6 @@ To feed seamlessly into downstream relational databases, automated innovation ra
 ## 🎡 Database structure
 ![](db_schema.png)
 *We generated three tables: one containing the articles, one with the opportunity space and a table connecting the two*
-
 
 
 
@@ -182,14 +196,13 @@ These scores were suggested by the client. In our app, we also give the power to
 
 
 ## ⚔️ Challenges 
-- country name: because of prompt eg USA or united states etc. 
-- time 30 vs 50 results (50 not running); even sometimes 30 run with no issue, but sometimes it run +++ time. 
-- keep optimizing the prompt to cover all the innovative topics, all over the world, competitive. 
-- Cost: increases with keywords input. 
-- create the db with student subscription 
-- scoring 
-- google trends API: limit of requests per specific time (not sure if day, hour etc.)
-- customize the prompt to have a wide variety of signals. 
+During the implementation of the project, we faced the following challenges: 
+1. Prompt-related: 
+- time contraint for signal collection: we capped to 30 signals per run; it was the sweetspot we determined to have a large number of signals in a reasonable amount of time (<10min per run). 
+- keyword optimization for each run to cover all the innovative topics, in a wide variety of countries and the competitors based on the results of the previous prompt.  
+2. Cost-related: we carried our project with the Azure student subscription. We implemented a balance between the number of new keywords to introduce, number of runs of both the gathering and the opportunity agent to stay within our alocated budget. 
+3. Scoring-related: develop a method to compute the scoring based on the data metrics alone, limiting as much as possible the use of LLM.
+
 
 ## ⌛Timeline 
 
