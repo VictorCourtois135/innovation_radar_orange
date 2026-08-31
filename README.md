@@ -2,7 +2,7 @@
 
 ## 📄 Brief description
 
-This is an Orange Business challenge undertaken at the Becode-data science and AI bootcamp. The mission is to create an innovation radar, where Orange Business can quickly evaluate emerging opportunity spaces in areas of strategic interest to get an informed decision on whether to pursue them. This tool is designed for three main target groups: 
+This is an Orange Business challenge undertaken at the Becode-data science and AI bootcamp. The mission is to create an innovation radar, where Orange Business can quickly evaluate emerging opportunity spaces (OS) in areas of strategic interest to get an informed decision on whether to pursue them. This tool is designed for three main target groups for our client: 
 - strategists and innovators
 - sales team
 - presales and proposal teams
@@ -13,41 +13,38 @@ This is an Orange Business challenge undertaken at the Becode-data science and A
 ### a. Objectives 
 
 We structure our Orange Business mission with the following objectives: 
-1. Automate collection of publicly available market insights to pinpoint emerging cutting-edge technologies, deployments of new infrastructures, advances of Orange Business competitors. We focus on both specific tech websites and de novo sites found by the agent in line with strategic priorities of Orange Business. 
-2. Store these information into an sql database (db) on Azure
-3. Generate opportunity spaces (OS) from the scraped information 
+1. Automate collection of publicly available market insights to pinpoint emerging cutting-edge technologies, deployments of new infrastructures, and advances of Orange Business competitors. We focus on both specific tech websites and de novo sites found by the agent in line with strategic priorities of Orange Business. 
+2. Store these information into an sql database (db) on Azure.
+3. Generate OS from the scraped information. 
 4. Generate a score for each OS to provide a hierarchy of priorities for Orange Business. 
-5. Create a customized user interface for the target groups to explore the OS
+5. Create a customized user interface for the target groups to explore the OS.
 
 
 ### b. Methodology
 
-1. We used a Microsoft foundry AI agent (gathering innovation agent) to crawl and extract structured market signals from the open web including customized specialized tech websites, according to Orange Business key interests (i.e., global and regional telecommunications and IT sectors). Prompt can be viewed in "Prompts" folder. We would like to note the following: 
+1. We used a Microsoft foundry AI agent (gathering innovation agent) to crawl and extract structured market signals from the open web including customized specialized tech websites, according to Orange Business key interests (i.e., global and regional telecommunications and IT sectors). The prompt we used can be viewed in the "Prompts" folder. We would like to note the following: 
 - the agent is forced to capture unique signals (distinct editorial outputs)
-- cap of 30 signals per run
-- strategic interests: cloud infrastructure, cybersecurity, finance, manufacturing, public services, AI, data intelligence, and IoT, collaboration, etc.
-- highlight the signals from Orange Business competitors
+- a cap of 30 signals per run has been imposed
+- clients strategic interests include: cloud infrastructure, cybersecurity, finance, manufacturing, public services, AI, data intelligence, and IoT, collaboration, etc.
+- we search for Orange Business competitors updates
 - we explicitely monitor for signals from 2024 onwards (prior to that, given the speed of technology innovation, we consider the signals outdated).
 - limit hallucinations: if the agent cannot meet the criteria we gave for the number of output, it stops and returns only the number of signals it retrieved for that particular run.
-- to have a wide variety of sources and signals, since we run the agent multiple times per day, we slightly modified the prompt not to capture duplicates (for eg, in the following runs we defined new keywords related to Orange business, or new countries where signals are sourced from > highly customizable prompt based on needs)
+- to have a wide variety of sources and signals, since we run the agent multiple times per day, we customized the prompt not to capture duplicates (for eg, in the downstream runs we defined new keywords related to Orange business, or new countries where signals are sourced from).
 2. Using a python script, we called the AI agent and stored the output into an SQL database hosted on Azure.
-3. We used a Microsoft foundry AI agent to create OS from Orange Business based on their areas of interest. 
-4. Using the above agent, we computed a score for each OS with the following considerations:
-
-Prompt can be viewed in "Prompts" folder.
-5. We used Streamlit to create an interactive web-based user interface (access through a local web browser). 
-
-
-
-
-
+3. We used a Microsoft foundry AI agent to create OS from Orange Business based on their areas of interest. Prompt can be viewed in "Prompts" folder.
+4. Using a python script, we computed an attractiveness score as follows: 
+a) each signal was embedded
+b) cosine similarity is computed for each signal with the other signals
+c) if three or more signals have a cosine similarity > 0.82, they are considered an opportunity space. 
+d) for each space, an attractiveness score is calculated ("see below attractiveness score").
+5. We used Streamlit to create an interactive web-based user interface (access through a local web browser; see below). 
 
 
 ---
 
 ## 🛕 Project architecture
 
-![pipeline](20260825_readme_images.png)
+![pipeline](assets/20260825_readme_images.png)
 
 *Schematic representation of our pipeline*
 
@@ -105,34 +102,18 @@ The app should open automatically at `http://localhost:8501`.
 
 ---
 
+
+
 ## 📊 Standardized Data Output
 
-To feed seamlessly into downstream relational databases, automated innovation radars, or enterprise business intelligence dashboards, the agent bypasses all conversational chat commentary or markdown formatting wrappers. It outputs **ONLY** a single, raw, valid JSON object following this strict schema:
-
-```json
-{
-  "signals": [
-    {
-      "id": 1,
-      "source_url": "https://example-telecom-press.com",
-      "source_name": "Publication or Regulator Name",
-      "title": "Exact Title of the Published Article or Official Document",
-      "publication_date": "2026-08-14",
-      "targeted_vertical": "Industry & Manufacturing",
-      "country": "Belgium",
-      "summary": "A granular, cohesive 3-5 sentence analytical breakdown detailing the technology deployed, the competitive impact, and the strategic positioning of the operator within that regional vertical market.",
-      "raw_excerpt": "Direct verbatim quote or key structural excerpt harvested from the source string to verify authenticity (Max 300 characters)."
-    }
-  ]
-}
-```
 
 
-## 🎡 Database structure
-![](db_schema.png)
+###  1. Database structure
+![](assets/db_schema.png)
 *We generated three tables: one containing the articles, one with the opportunity space and a table connecting the two*
 
 
+### 2. Innovation radar app 
 
 
 
@@ -164,7 +145,7 @@ The cluster's average tier is converted to a 0–100 score as follows: 100 − (
 
 For each of these scores, a weight is attributed and they are summed as in the formula below, to compute the final attractiveness score:  
 
-![formula score](20260831_score_formula.png)
+![formula score](assets/20260831_score_formula.png)
 
 
 These scores were suggested by the client. In our app, we also give the power to the user to change the weight of the scores based on the signal they are interested in the most. 
