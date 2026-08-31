@@ -11,6 +11,7 @@ from __future__ import annotations
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
+import streamlit.components.v1 as components
 
 from radar import config as C
 from radar import data as data_module
@@ -115,6 +116,60 @@ def _portfolio_average(df: pd.DataFrame, columns: list[str]) -> list[float] | No
     return values
 
 
+def _scroll_to_top() -> None:
+    """Force the page back to its top.
+
+    Streamlit doesn't reset scroll position on navigation between pages —
+    switching page keeps whatever scroll offset the previous page had, which
+    is disorienting when arriving here via a click from a table or chart
+    further down another page. This injects a tiny invisible component whose
+    only job is to run a scroll-to-top script against the outer app.
+
+    Two things make a single, immediate `scrollTo(0, 0)` unreliable here:
+    - Streamlit's scrollable container's selector/data-testid has changed
+      across versions (section.main, [data-testid="stMain"],
+      [data-testid="stAppViewContainer"], or just the document itself), so
+      several candidates are tried rather than one fixed selector.
+    - This page's own content (Plotly charts in particular) can still be
+      laying out for a short moment after this script first runs, which can
+      silently undo an immediate scroll. The script re-runs a few times on
+      a short delay to win against that.
+    """
+    components.html(
+        """
+        <script>
+            function scrollAppToTop() {
+                const doc = window.parent.document;
+                const candidates = [
+                    doc.querySelector('section.main'),
+                    doc.querySelector('[data-testid="stMain"]'),
+                    doc.querySelector('[data-testid="stAppViewContainer"]'),
+                    doc.scrollingElement,
+                    doc.documentElement,
+                    doc.body,
+                ];
+                candidates.forEach(function (el) {
+                    if (!el) { return; }
+                    if (typeof el.scrollTo === 'function') {
+                        el.scrollTo(0, 0);
+                    } else {
+                        el.scrollTop = 0;
+                    }
+                });
+                if (window.parent && typeof window.parent.scrollTo === 'function') {
+                    window.parent.scrollTo(0, 0);
+                }
+            }
+            scrollAppToTop();
+            setTimeout(scrollAppToTop, 50);
+            setTimeout(scrollAppToTop, 200);
+            setTimeout(scrollAppToTop, 500);
+        </script>
+        """,
+        height=0,
+    )
+
+
 def _render_status_control(data: dict, row: pd.Series) -> None:
     """Selectbox + button to change this opportunity's status in Azure SQL.
 
@@ -211,6 +266,10 @@ def render(data: dict, df: pd.DataFrame) -> None:
         match = next((label for label, oid in labels.items() if oid == incoming_id), None)
         if match is not None:
             st.session_state["detail_selectbox"] = match
+        # Only scroll on an actual navigation into this page, not on every
+        # rerun caused by, say, moving the status selectbox — those reruns
+        # never carry an incoming_id since it's popped the first time.
+        _scroll_to_top()
 
     # Guard against a stale selection: if the current filters (sidebar or
     # persona) have narrowed df so the previously chosen label no longer
@@ -256,48 +315,16 @@ def render(data: dict, df: pd.DataFrame) -> None:
 
     _render_status_control(data, row)
 
-    left, right = st.columns([3, 2], gap="large")
+    # --------------------------------------------------- score + radar chart
+    # Only these two elements sit side by side. Everything else below reads
+    # top to bottom in a single full-width column, since none of it benefits
+    # from being squeezed next to something else.
+    score_col, chart_col = st.columns([2, 3], gap="large")
 
-    # ---------------------------------------------------------- explanation
-    with left:
-        detailed_summary = row.get("detailed_summary")
+    components = _stored_components(row)
+    available_components = components.dropna(subset=["score"])
 
-        if (
-            "detailed_summary" in row.index
-            and detailed_summary is not None
-            and not pd.isna(detailed_summary)
-            and str(detailed_summary).strip()
-        ):
-            st.markdown("### Overview")
-            st.write(detailed_summary)
-
-        st.markdown("### Why this is hot now")
-        st.write(row.get("why_hot", "Not recorded."))
-
-        st.markdown("### Why it matters to Orange")
-        st.write(row.get("why_matters", "Not recorded."))
-
-        st.markdown("### Recommended next action")
-        st.success(row.get("next_action", "Not recorded."))
-
-        capability_note = row.get("capability_check_note")
-
-        if (
-            capability_note is not None
-            and not pd.isna(capability_note)
-            and str(capability_note).strip()
-        ):
-            st.markdown("### Capability check")
-            st.info(capability_note)
-            st.caption(
-                "Before scoring, each cluster is compared against Orange's "
-                "known deployed capabilities, including their geographic scope. "
-                "If Orange already sells this in this market, the cluster is "
-                "skipped and does not become an opportunity."
-            )
-
-    # --------------------------------------------------------- stored score
-    with right:
+    with score_col:
         st.markdown("### Attractiveness")
 
         attractiveness_score = pd.to_numeric(
@@ -310,32 +337,30 @@ def render(data: dict, df: pd.DataFrame) -> None:
         else:
             st.markdown(
                 f"""
-                <div style="
-                    font-size:64px;
-                    line-height:1;
-                    font-weight:700;
-                    color:{C.ORANGE};
-                ">
-                    {attractiveness_score:.1f}
-                </div>
-                <div style="color:{C.GREY_MED};font-size:13px">
-                    out of 100
+                <div style="text-align:center; padding: 24px 0;">
+                    <div style="
+                        font-size:96px;
+                        line-height:1;
+                        font-weight:700;
+                        color:{C.ORANGE};
+                    ">
+                        {attractiveness_score:.1f}
+                    </div>
+                    <div style="color:{C.GREY_MED};font-size:14px">
+                        out of 100
+                    </div>
                 </div>
                 """,
                 unsafe_allow_html=True,
             )
 
-        st.caption(
-            "This is the final score stored by the backend pipeline. "
-            "The dashboard does not recalculate it."
-        )
 
-        components = _stored_components(row)
-        available_components = components.dropna(subset=["score"])
 
         if available_components.empty:
             st.info("No stored component scores are available for this opportunity.")
-        else:
+
+    with chart_col:
+        if not available_components.empty:
             # A five-axis shape on its own tells you almost nothing: 54 on
             # evidence quality is only meaningful next to what the other
             # opportunities score. So the portfolio average is drawn behind it as
@@ -361,11 +386,11 @@ def render(data: dict, df: pd.DataFrame) -> None:
                 )
 
             scores = list(available_components["score"])
-            labels = list(available_components["short"])
+            comp_labels = list(available_components["short"])
             radar_figure.add_trace(
                 go.Scatterpolar(
                     r=scores + scores[:1],
-                    theta=labels + labels[:1],
+                    theta=comp_labels + comp_labels[:1],
                     name=str(row["code"]),
                     mode="lines+markers",
                     line=dict(color=C.CAT[0], width=3),
@@ -402,11 +427,44 @@ def render(data: dict, df: pd.DataFrame) -> None:
             )
 
             st.plotly_chart(radar_figure, width="stretch")
-            st.caption(
-                "The five component scores as stored in Azure SQL, against the "
-                "average across every opportunity currently in view. Nothing is "
-                "recalculated here."
-            )
+
+    # ---------------------------------------------------------- explanation
+    # Full width from here on — no columns.
+    detailed_summary = row.get("detailed_summary")
+
+    if (
+        "detailed_summary" in row.index
+        and detailed_summary is not None
+        and not pd.isna(detailed_summary)
+        and str(detailed_summary).strip()
+    ):
+        st.markdown("### Overview")
+        st.write(detailed_summary)
+
+    st.markdown("### Why this is hot now")
+    st.write(row.get("why_hot", "Not recorded."))
+
+    st.markdown("### Why it matters to Orange")
+    st.write(row.get("why_matters", "Not recorded."))
+
+    st.markdown("### Recommended next action")
+    st.success(row.get("next_action", "Not recorded."))
+
+    capability_note = row.get("capability_check_note")
+
+    if (
+        capability_note is not None
+        and not pd.isna(capability_note)
+        and str(capability_note).strip()
+    ):
+        st.markdown("### Capability check")
+        st.info(capability_note)
+        st.caption(
+            "Before scoring, each cluster is compared against Orange's "
+            "known deployed capabilities, including their geographic scope. "
+            "If Orange already sells this in this market, the cluster is "
+            "skipped and does not become an opportunity."
+        )
 
     # -------------------------------------------------- stored score inputs
     st.markdown("### Stored scoring components")
@@ -415,8 +473,6 @@ def render(data: dict, df: pd.DataFrame) -> None:
         "pipeline and saved with the opportunity. This page does not apply "
         "weights or calculate a new final score."
     )
-
-    components = _stored_components(row)
 
     st.dataframe(
         components[

@@ -34,6 +34,21 @@ def _reset_weights() -> None:
         st.session_state[f"weight_slider_{column}"] = _default_weight_pct(column)
 
 
+def _go_to_detail(opportunity_id) -> None:
+    """Request navigation to the detail page for one opportunity.
+
+    Mirrors opportunities.py's _go_to_detail: writes to "pending_page"
+    rather than "page_name" directly, since app.py has already instantiated
+    the sidebar radio with key="page_name" for this run and Streamlit
+    forbids writing to a widget's own key after it's created. app.py picks
+    "pending_page" up and applies it BEFORE creating the radio on the next
+    run.
+    """
+    st.session_state["selected_opportunity_id"] = opportunity_id
+    st.session_state["pending_page"] = "Opportunity detail"
+    st.rerun()
+
+
 def _render_formula() -> None:
     st.markdown("### The formula")
 
@@ -153,7 +168,7 @@ def _render_recalculated_list(df: pd.DataFrame, weights: dict[str, float]) -> No
         return f"{arrow} {abs(int(value))}"
 
     scored["rank_change_display"] = scored["rank_change"].apply(_format_rank_change)
-    scored = scored.sort_values("adjusted_score", ascending=False)
+    scored = scored.sort_values("adjusted_score", ascending=False).reset_index(drop=True)
 
     # ------------------------------------------------------------- summary
     moved_up = int((scored["rank_change"] > 0).sum())
@@ -180,21 +195,40 @@ def _render_recalculated_list(df: pd.DataFrame, weights: dict[str, float]) -> No
         "attractiveness_score": "Stored score",
         "adjusted_score": "Your score",
         "delta": "Change",
-        "rank_change_display": "Rank change",
+        "rank_change_display": "Position change",
     }
 
     available = [c for c in display_columns if c in scored.columns]
 
-    st.dataframe(
+    st.caption("Click a row's checkbox to open that opportunity's detail page.")
+
+    table_event = st.dataframe(
         scored[available].rename(columns=display_columns),
         width="stretch",
         hide_index=True,
+        on_select="rerun",
+        selection_mode="single-row",
+        key="scoring_table",
         column_config={
             "Stored score": st.column_config.NumberColumn(format="%.1f"),
             "Your score": st.column_config.NumberColumn(format="%.1f"),
             "Change": st.column_config.NumberColumn(format="%+.1f"),
         },
     )
+
+    # st.dataframe's on_select reports the selected row(s) as *positional*
+    # indices into the dataframe passed to it — which line up 1:1 with
+    # "scored" here since it was reset_index()'d right before display, and
+    # nothing reorders it afterwards. "id" isn't part of the displayed
+    # columns, so it's looked up from "scored" itself rather than from
+    # what's on screen.
+    selected_rows = (
+        table_event.get("selection", {}).get("rows", []) if table_event else []
+    )
+    if selected_rows:
+        selected_index = selected_rows[0]
+        if 0 <= selected_index < len(scored) and "id" in scored.columns:
+            _go_to_detail(scored.iloc[selected_index]["id"])
 
     # ------------------------------------------------------------- scatter
     st.markdown("### Stored score vs. your score")

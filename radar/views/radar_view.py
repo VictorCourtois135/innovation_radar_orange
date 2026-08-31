@@ -6,33 +6,33 @@ Encoding, and why
     radius = urgency, continuously — the ring boundaries are the same
              thresholds data.classify_horizon uses, so a bubble's distance from
              the centre means "how soon" both within a ring and across rings
-    hue    = the ring it lands in (Now / Next / Later), so it is nameable
+    ring   = the horizon it lands in (Now / Next / Later) — drawn as concentric
+             bands and named in annotations, not colour
+    colour = status (Candidate / Watchlist / Validated / Rejected), solid fill —
+             this is the one thing on the page a reader needs to separate at a
+             glance across the whole chart, so it gets the whole colour channel
     sector = vertical group
     size   = attractiveness score
     label  = the opportunity code, printed on every bubble
 
 What changed, and the measurement behind it
 -------------------------------------------
-The earlier version encoded ``attractiveness_score`` as **both** colour and
-size, and described that as deliberate redundancy. Redundant encoding is a real
-technique, but it only works when the variable actually varies across the range
-you give it. Here it did not:
+Colour used to encode time horizon, with status relegated to a thin marker
+border. Two problems with that:
 
-* the seven stored scores span **48.8 to 76.1**, while ``range_color`` was set to
-  ``(0, 100)`` - so every bubble landed in the same narrow band of the ramp and
-  came out the same mid-orange, with half the colour bar covering values no row
-  has;
-* Plotly sizes bubbles by area, so 48.8 against 76.1 is a radius ratio of 0.80 -
-  visually near-identical too.
+* horizon was already fully legible from ring position (radius) and from the
+  ring annotations/backdrop — colour was carrying the same information twice;
+* status — which the reader can't get from position at all — was squeezed into
+  a 3px outline, the weakest channel on the chart, on top of an already-busy
+  fill colour.
 
-Two channels, one variable, nothing readable from either. So colour has been
-moved to the one thing on this page a reader actually needs to separate at a
-glance - the horizon ring - and size has been given an explicit ``sizeref`` fitted
-to the data instead of the default, so the spread that does exist is visible.
-
-The number itself is no longer left to a colour bar: every bubble is labelled
-with its code, the hover carries the score, and the table below repeats it. That
-also satisfies the contrast relief the palette requires (see ``theme``).
+So the assignment has been swapped: fill colour is now status, solid (not just
+an outline), and horizon has been left to do its existing job through ring
+position alone. Because colour now varies *within* each horizon trace rather
+than being constant per trace, the horizon legend can no longer show a single
+correct swatch per entry — so horizon counts are shown as plain annotations
+instead, and a proper status legend is built from small dummy traces so each
+status gets its own correct-coloured swatch.
 
 Angular collisions
 ------------------
@@ -40,6 +40,24 @@ Angular collisions
 spokes and a mostly empty circle. Bubbles are now placed on the coarse vertical
 *group*, and any two landing on the same spoke are fanned apart by a small,
 deterministic angular offset instead of drawing on top of each other.
+
+Label collisions
+-----------------
+Bubble text labels used a single fixed ``textposition="top center"`` for every
+labeled bubble. When two labeled bubbles land close together (common near the
+crowded inner rings), their text prints in the same place and merges into
+unreadable overlapping text. Labels are now staggered: for each labeled bubble
+we count how many *already-placed* labels sit within a proximity radius and
+rotate through a small set of textpositions (top / bottom / right / left of
+the marker) so nearby labels fan out instead of stacking.
+
+The ring annotations ("Now (17)", "Next (12)", "Later (1)") used to be placed
+at a single angle computed from the spoke layout, on the assumption that angle
+would be empty. That assumption doesn't hold once bubbles are angularly
+jittered to avoid collisions (see above), so the annotation could land right
+on top of a bubble's label. They're now anchored to a fixed spot outside the
+polar plotting area (top-right corner, in paper coordinates) so they can never
+overlap a data point regardless of how the bubbles are laid out.
 """
 
 from __future__ import annotations
@@ -55,15 +73,55 @@ from radar import theme
 # Radial band each horizon occupies. Inner = more urgent.
 RING_BOUNDS = {"Now": (0.15, 0.95), "Next": (1.15, 1.95), "Later": (2.15, 2.95)}
 RING_MAX = 3.0
+TOP_LABEL_COUNT = 10
+
+# Textpositions cycled through when two labeled bubbles land moderately close
+# together, so their text fans out around the marker instead of overlapping.
+LABEL_POSITION_CYCLE = ["top center", "bottom center", "middle right", "middle left"]
+# Below this cartesian distance (in polar r/theta-derived units), two labels
+# would still overlap regardless of textposition, so the lower-priority one is
+# dropped rather than rendered on top of the other.
+LABEL_DROP_THRESHOLD = 0.45
+# Between DROP and STAGGER, labels are kept but rotated through
+# LABEL_POSITION_CYCLE so they fan out instead of both defaulting to the same
+# "top center" spot.
+LABEL_STAGGER_THRESHOLD = 0.85
+
+# Solid fill colour per status. Keys are matched case-insensitively against the
+# "status" column; anything unmatched falls back to "unknown".
+STATUS_FILL_COLORS = {
+    "candidate": "#F5C518",   # yellow
+    "watchlist": "#4D1FF5",   # orange
+    "validated": "#2E9E4F",   # green
+    "rejected": "#D93B3B",    # red
+    "unknown": C.GREY_MED,
+}
+
+STATUS_LABELS = {
+    "candidate": "Candidate",
+    "watchlist": "Watchlist",
+    "validated": "Validated",
+    "rejected": "Rejected",
+    "unknown": "Unknown",
+}
+
+
+def _format_radar_label(value) -> str:
+    """Split a technology label over two short lines."""
+    words = str(value).strip().split()
+
+    if len(words) <= 1:
+        return str(value).strip()
+
+    midpoint = (len(words) + 1) // 2
+    first_line = " ".join(words[:midpoint])
+    second_line = " ".join(words[midpoint:])
+
+    return f"{first_line}<br>{second_line}"
 
 
 def _radius_for(row) -> float:
     """Radius from the actual urgency score, not from random jitter.
-
-    The first version scattered each bubble at a random radius inside its ring.
-    That looked like a placement decision but carried no information, and worse,
-    it *implied* one: a reader comparing two bubbles in the Next ring would take
-    the inner one for the more urgent, when the difference was a random draw.
 
     Urgency runs 0-100 and the ring boundaries are the same thresholds
     ``data.classify_horizon`` uses, so each ring's band maps straight onto its
@@ -89,6 +147,11 @@ def _radius_for(row) -> float:
     return high - position * (high - low)
 
 
+def _status_key(status) -> str:
+    key = str(status).strip().lower()
+    return key if key in STATUS_FILL_COLORS else "unknown"
+
+
 def _prepare(df: pd.DataFrame) -> pd.DataFrame:
     """Give every opportunity an (angle, radius) that does not collide."""
     plot_df = df.copy()
@@ -105,6 +168,8 @@ def _prepare(df: pd.DataFrame) -> pd.DataFrame:
     radii: list[float] = []
     # How many bubbles are already on this spoke, so the n-th one is fanned off
     # centre rather than drawn on top of the first.
+    group_sizes = plot_df["vertical_group"].value_counts().to_dict()
+
     seen: dict[str, int] = {}
 
     for _, row in plot_df.iterrows():
@@ -112,12 +177,18 @@ def _prepare(df: pd.DataFrame) -> pd.DataFrame:
         index = seen.get(group, 0)
         seen[group] = index + 1
 
-        # 0, +9, -9, +18, -18 ... degrees off the spoke, capped so a bubble never
-        # drifts into the neighbouring sector.
-        offset = ((index + 1) // 2) * 9.0 * (1 if index % 2 else -1)
-        offset = float(np.clip(offset, -step / 2.5, step / 2.5))
-        thetas.append(base_angle[group] + offset)
+        # Spread every bubble evenly across the available sector instead of
+        # repeatedly placing crowded bubbles at the same maximum offset.
+        group_size = group_sizes[group]
 
+        if group_size == 1:
+            offset = 0.0
+        else:
+            sector_limit = step * 0.42
+            offsets = np.linspace(-sector_limit, sector_limit, group_size)
+            offset = float(offsets[index])
+
+        thetas.append(base_angle[group] + offset)
         radii.append(_radius_for(row))
 
     plot_df["theta"] = thetas
@@ -125,33 +196,115 @@ def _prepare(df: pd.DataFrame) -> pd.DataFrame:
     return plot_df
 
 
-def _ring_backdrop(fig: go.Figure) -> None:
-    """A faint band behind the middle ring, so the three zones read as zones.
+def _assign_label_positions(plot_df: pd.DataFrame, labeled_codes: set) -> tuple[dict, set]:
+    """Place labels for the top-scoring bubbles without letting any two merge.
 
-    Drawn as an annulus: the outer edge anticlockwise, the inner edge back
-    clockwise, closed with ``fill="toself"``. Without the reversed inner arc the
-    fill would cross the centre and shade the Now ring too.
+    Rotating a label's textposition only helps when bubbles are moderately
+    apart — in a tight cluster (e.g. four candidate opportunities on
+    neighbouring spokes at a similar radius) the small set of textpositions
+    runs out and starts repeating, so two labels still land in the same spot
+    and merge into unreadable text.
+
+    So this does two things, processing candidates from highest
+    attractiveness score to lowest (so the most important label in a cluster
+    is the one that wins a spot):
+
+    * if a candidate lands within ``LABEL_DROP_THRESHOLD`` of an
+      already-placed, higher-priority label, no textposition would separate
+      them enough to read cleanly — its label is dropped rather than drawn
+      overlapping;
+    * otherwise, if it's still within ``LABEL_STAGGER_THRESHOLD``, it's kept
+      but rotated to the next entry in ``LABEL_POSITION_CYCLE`` so it fans out
+      away from its neighbour instead of defaulting to the same "top center".
+
+    Returns (textposition-by-code, set of codes whose label was dropped).
+    """
+    candidates = plot_df[plot_df["code"].isin(labeled_codes)].copy()
+    if candidates.empty:
+        return {}, set()
+
+    theta_rad = np.radians(candidates["theta"].to_numpy(dtype=float))
+    r = candidates["r"].to_numpy(dtype=float)
+    candidates["_x"] = r * np.cos(theta_rad)
+    candidates["_y"] = r * np.sin(theta_rad)
+
+    # Highest-priority label in a cluster wins the spot; lower-priority
+    # neighbours are the ones that get dropped or pushed aside.
+    candidates = candidates.sort_values("attractiveness_score", ascending=False)
+
+    positions: dict[str, str] = {}
+    dropped: set[str] = set()
+    placed_xy: list[tuple[float, float]] = []
+
+    for code, x, y in zip(candidates["code"], candidates["_x"], candidates["_y"]):
+        nearest = (
+            min(((x - px) ** 2 + (y - py) ** 2) ** 0.5 for px, py in placed_xy)
+            if placed_xy else float("inf")
+        )
+
+        if nearest < LABEL_DROP_THRESHOLD:
+            dropped.add(code)
+            continue
+
+        cycle_index = len(placed_xy) % len(LABEL_POSITION_CYCLE) if nearest < LABEL_STAGGER_THRESHOLD else 0
+        positions[code] = LABEL_POSITION_CYCLE[cycle_index]
+        placed_xy.append((x, y))
+
+    return positions, dropped
+
+
+def _ring_backdrop(fig: go.Figure) -> None:
+    """Alternating-contrast bands behind each ring, so Now/Next/Later read as
+    three distinct zones on sight, not just from the axis gridlines.
+
+    Colour no longer marks horizon (that channel now belongs to status), so
+    the zones need a non-hue cue instead: greyscale shade, stepped up and down
+    band to band (zebra-striping) rather than a single flat tint, since a
+    monotonic gradient would make Now and Later look like more/less of the
+    same thing rather than three separate zones.
+
+    Each band is drawn as an annulus: the outer edge anticlockwise, the inner
+    edge back clockwise, closed with ``fill="toself"``. The innermost band
+    (Now) is a plain filled circle since it has no inner edge to reverse.
+
+    Bands step from white (Now, most urgent) through light grey (Next) to a
+    slightly darker grey (Later), rather than zebra-striping — a steady
+    step outward reads as "further away" more directly than an
+    alternating pattern does.
     """
     outer = list(np.linspace(0, 360, 181))
     inner = outer[::-1]
-    low, high = 1.0, 2.0
-    fig.add_trace(
-        go.Scatterpolar(
-            r=[high] * len(outer) + [low] * len(inner),
-            theta=outer + inner,
-            mode="lines",
-            line=dict(width=0),
-            fill="toself",
-            fillcolor="rgba(17,17,17,0.028)",
-            hoverinfo="skip",
-            showlegend=False,
+
+    bands = [
+        (0.0, 1.0, "rgba(17,17,17,0.0)"),    # Now   — pure white
+        (1.0, 2.0, "rgba(17,17,17,0.06)"),   # Next  — light grey
+        (2.0, 3.0, "rgba(17,17,17,0.16)"),   # Later — clearly darker grey
+    ]
+
+    for low, high, fillcolor in bands:
+        if low == 0.0:
+            r = [high] * len(outer)
+            theta = outer
+        else:
+            r = [high] * len(outer) + [low] * len(inner)
+            theta = outer + inner
+        fig.add_trace(
+            go.Scatterpolar(
+                r=r,
+                theta=theta,
+                mode="lines",
+                line=dict(width=0),
+                fill="toself",
+                fillcolor=fillcolor,
+                hoverinfo="skip",
+                showlegend=False,
+            )
         )
-    )
 
 
 def render(data: dict, df) -> None:
     theme.banner(
-        "Innovation Radar",
+        "Discover verified opportunities across horizons",
         "Opportunity spaces by vertical (sector) and time horizon (ring)",
     )
 
@@ -175,6 +328,10 @@ def render(data: dict, df) -> None:
         return
 
     plot_df = _prepare(df)
+    top_label_codes = set(
+        plot_df.nlargest(TOP_LABEL_COUNT, "attractiveness_score")["code"]
+    )
+    label_positions, dropped_label_codes = _assign_label_positions(plot_df, top_label_codes)
     groups = sorted(plot_df["vertical_group"].unique())
 
     # Size: fit the reference to the data actually on screen rather than letting
@@ -190,8 +347,17 @@ def render(data: dict, df) -> None:
     fig = go.Figure()
     _ring_backdrop(fig)
 
-    for horizon in C.HORIZONS:
-        subset = plot_df[plot_df["time_horizon"] == horizon]
+    # One trace per status, not per horizon. Each trace now has a single solid
+    # colour, which is what lets the legend actually control the data: a click
+    # can isolate "only Rejected" because Rejected *is* a trace, rather than a
+    # colour scattered across three horizon-traces that all show/hide together.
+    # Ring position (radius) still comes from horizon via plot_df["r"], computed
+    # earlier — splitting by status here doesn't touch that.
+    status_order = ["candidate", "watchlist", "validated", "rejected", "unknown"]
+    plot_df["_status_key"] = plot_df["status"].fillna(C.STATUS_UNKNOWN).map(_status_key)
+
+    for key in status_order:
+        subset = plot_df[plot_df["_status_key"] == key]
         if subset.empty:
             continue
         subset_size = sized.loc[subset.index]
@@ -200,20 +366,32 @@ def render(data: dict, df) -> None:
                 r=subset["r"],
                 theta=subset["theta"],
                 mode="markers+text",
-                name=f"{horizon} ({len(subset)})",
-                text=subset["code"],
-                textposition="top center",
+                name=STATUS_LABELS[key],
+                showlegend=True,
+                text=[
+                    _format_radar_label(technology)
+                    if code in top_label_codes and code not in dropped_label_codes
+                    else ""
+                    for code, technology in zip(subset["code"], subset["technology"])
+                ],
+                # Per-point textposition (not a single shared string) so
+                # labeled bubbles that sit close together fan their text out
+                # instead of printing on top of one another. See
+                # _assign_label_positions.
+                textposition=[
+                    label_positions.get(code, "top center") for code in subset["code"]
+                ],
                 textfont=dict(size=11, color=C.GREY_DARK),
                 marker=dict(
                     size=subset_size,
                     sizemode="area",
-                    # One shared reference across all three traces, so a bubble in
-                    # the Later ring is comparable to one in the Now ring.
-                    sizeref=(2.0 * float(sized.max())) / (46.0 ** 2),
+                    # One shared reference across all five status traces, so a
+                    # bubble in one trace is comparable in area to any other.
+                    sizeref=(2.0 * float(sized.max())) / (36.0 ** 2),
                     sizemin=8,
-                    color=C.HORIZON_COLORS[horizon],
-                    opacity=0.88,
-                    line=dict(width=2, color=C.WHITE),  # 2px surface ring
+                    color=STATUS_FILL_COLORS[key],
+                    opacity=0.92,
+                    line=dict(width=1.5, color=C.WHITE),
                 ),
                 customdata=np.stack([
                     subset["name"].astype(str),
@@ -223,6 +401,7 @@ def render(data: dict, df) -> None:
                     scores.loc[subset.index].astype(float),
                     subset["vertical"].astype(str),
                     subset.get("countries", pd.Series("Unknown", index=subset.index)).astype(str),
+                    subset["time_horizon"].astype(str),
                 ], axis=-1),
                 hovertemplate=(
                     "<b>%{customdata[0]}</b><br>"
@@ -230,6 +409,7 @@ def render(data: dict, df) -> None:
                     "Technology: %{customdata[2]}<br>"
                     "Use case: %{customdata[3]}<br>"
                     "Attractiveness: %{customdata[4]:.1f} / 100<br>"
+                    "Horizon: %{customdata[7]}<br>"
                     "Markets: %{customdata[6]}"
                     "<extra></extra>"
                 ),
@@ -239,23 +419,28 @@ def render(data: dict, df) -> None:
     step_deg = 360.0 / max(len(groups), 1)
     spokes = [index * step_deg for index in range(len(groups))]
 
-    # Ring names used to be radial tick labels, which Plotly draws inside the
-    # plotting area along one radius — they landed on top of the bubbles and,
-    # rotated upright, read as broken text. They are drawn instead as plain
-    # annotations on the emptiest half-sector, horizontal, so they sit in white
-    # space. The legend names the same three rings by colour, so this is a
-    # convenience label rather than the only route to the information.
-    label_deg = (spokes[-1] + step_deg / 2.0) if spokes else 45.0
+    # Ring names are drawn as plain annotations, not radial tick labels
+    # (Plotly draws those inside the plotting area along one radius, where
+    # they land on top of bubbles). They used to be placed at an angle chosen
+    # from spoke geometry alone, on the assumption that angle would be empty
+    # of bubbles — but bubbles are angularly jittered to avoid collisions
+    # (see _prepare), so that assumption can fail and the annotation can land
+    # on a bubble's label (as seen with "Later (1)" over a bubble). They're
+    # now anchored to a fixed corner in paper coordinates, stacked vertically,
+    # entirely outside the polar plotting area — so they can never overlap a
+    # data point regardless of the current layout.
+    horizon_counts = plot_df["time_horizon"].value_counts().to_dict()
     ring_annotations = [
         dict(
-            text=horizon,
+            text=f"{horizon} ({horizon_counts.get(horizon, 0)})",
             showarrow=False,
             font=dict(size=11, color=C.GREY_MED),
             xref="paper", yref="paper",
-            x=0.5 + 0.5 * (radius / RING_MAX) * np.cos(np.radians(label_deg + 90)),
-            y=0.5 + 0.5 * (radius / RING_MAX) * np.sin(np.radians(label_deg + 90)),
+            xanchor="left", yanchor="top",
+            x=1.0,
+            y=0.98 - index * 0.035,
         )
-        for horizon, radius in zip(C.HORIZONS, (0.6, 1.6, 2.6))
+        for index, horizon in enumerate(C.HORIZONS)
     ]
 
     fig.update_polars(
@@ -278,20 +463,28 @@ def render(data: dict, df) -> None:
         ),
         bgcolor=C.WHITE,
         # Leave room around the circle so long sector names are not clipped.
-        domain=dict(x=[0.13, 0.87], y=[0.02, 0.9]),
+        domain=dict(x=[0.04, 0.90], y=[0.02, 0.94]),
     )
     fig.update_layout(
-        height=680,
+        height=1000,
         paper_bgcolor=C.WHITE,
         font_color=C.GREY_DARK,
         showlegend=True,
         legend=dict(
             orientation="h", yanchor="top", y=1.0,
-            xanchor="center", x=0.5, title_text="Time horizon  ",
+            xanchor="center", x=0.5,
             font=dict(size=12),
         ),
+        # Plotly's default is click=toggle-this-one, double-click=isolate.
+        # Swapped here so a single click on a status does what was asked —
+        # shows only that status's bubbles, hiding the rest — and a
+        # double-click on an already-isolated status switches it off on its
+        # own instead. Clicking any status again restores everyone (Plotly's
+        # native behaviour once nothing is isolated).
+        legend_itemclick="toggleothers",
+        legend_itemdoubleclick="toggle",
         annotations=ring_annotations,
-        margin=dict(t=20, b=20, l=20, r=20),
+        margin=dict(t=20, b=20, l=20, r=90),
     )
     st.plotly_chart(fig, use_container_width=True)
 
@@ -304,10 +497,11 @@ def render(data: dict, df) -> None:
         )
 
     st.caption(
-        "Ring and colour both = time horizon, inner and orange being the most "
-        "urgent. Sector = vertical group. Bubble size = attractiveness score, "
-        "and every bubble is labelled with its code — the exact numbers are in "
-        "the table below."
+        "Ring = time horizon (labelled on the chart), inner being most urgent. "
+        "Sector = vertical group. Colour = status — yellow candidate, orange "
+        "watchlist, green validated, red rejected. Bubble size = attractiveness "
+        "score, and every bubble is labelled with its code — the exact numbers "
+        "are in the table below."
     )
 
     if len(df) < 10:
@@ -323,7 +517,7 @@ def render(data: dict, df) -> None:
     with st.expander("Table view of the same data", expanded=True):
         table = plot_df.copy()
         cols = [c for c in ["code", "name", "vertical_group", "vertical", "technology",
-                            "time_horizon", "attractiveness_score",
+                            "time_horizon", "status", "attractiveness_score",
                             "total_articles", "distinct_sources", "countries"]
                 if c in table.columns]
         st.dataframe(
@@ -335,6 +529,7 @@ def render(data: dict, df) -> None:
                 "vertical_group": "Vertical group",
                 "vertical": "Vertical (as written by the agent)",
                 "time_horizon": "Horizon",
+                "status": "Status",
                 "attractiveness_score": st.column_config.ProgressColumn(
                     "Attractiveness", min_value=0, max_value=100, format="%.1f",
                 ),
