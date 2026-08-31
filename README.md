@@ -61,16 +61,16 @@ Prompt can be viewed in "Prompts" folder.
 |drawDB             | db schema             |
 |Azure              | cloud computing       |
 |AI foundry agent   | AI agent              |
+|GPT5-mini          |   LLM                 |
+|text-embedding-3-large |embedding          |
+|pytrends           | python library for google trends |
 |Streamlit          |  User interface       |
 |Git/github         | version control       |
 
 
->> explain specific tools used and why they are good for this project. 
-
-
 ## 📁 Repo structure
 
-This repository contains the configuration and operational instructions for an automated **AI Monitoring Agent**. The agent is automated **Extraction Agent** engineered to crawl, evaluate, and extract structured market signals from the open web and specialized tech publications and systematically scan, filter, and extract high-value competitive market signals and regulatory shifts across global and regional telecommunications and IT enterprise sectors. It sits upstream of our data pipeline, feeding clean payloads directly into the processing engine.
+
 
 
 
@@ -119,19 +119,67 @@ To feed seamlessly into downstream relational databases, automated innovation ra
 
 
 
-## 💫 Top 5 unique features 
+
+
+
+
+
+## 💡 Attractiveness score for each OS 
+We computed a different scores (0 to 100)for each OS to determine how attractive it is for Orange Business based on the following criteria:
+
+**1. signal market**: the maximum number of signals in one of the following:
+- volume: number of collected signals in the cluster on a logarithmic curve
+- google trends: real public search interest for the technology keyword over the last 12 months (via pytrends). Values below a noise floor of 15 are ignored entirely.
+
+**2. source diversity**: the number of distinct sources divided by the number of signals (x100).
+
+**3. evidence quality**: based on the source of the article, we attribute a rank. Each signal's source is matched to a 1–5 tier in source_registry.csv as follows: 
+- regulators, wire services: 100
+- paid analyst firms: 75
+- specialized trade press: 50
+- aggregators, wire distribution: 25
+- compant owned press releases: 0
+The cluster's average tier is converted to a 0–100 score as follows: 100 − (average_tier − 1) × 25.
+
+**4. urgency**: we take the date of each publication in the cluster and convert it to a score (continuous exponential decay, i.e., 100: publication from today, 50: publication from 9 months ago). Then we average the scores for each cluster. 
+
+**5. strategic relevance**: this is the only metric done by LLM; it is a judgment call that cannot be computed by data. It answers to the the question "does it matter to Orange Business". A score is attributed as follows: 
+- 70-90+: corresponds to a known strategic priority
+- 50-70: good fit for Orange Business, outside the known pillars but connected with their overall entreprise vision
+- <50: a field that Orange Business has exited or has never invested before.
+
+For each of these scores, a weight is attributed and they are summed as in the formula below, to compute the final attractiveness score:  
+
+![formula score](20260831_score_formula.png)
+
+
+These scores were suggested by the client. In our app, we also give the power to the user to change the weight of the scores based on the signal they are interested in the most. 
+
+## ✅ Accuracy of results 
+
+1. Traceability: every opportunity space is linked to its exact source signals.
+2. Attractiveness score is clear: four of the sub score can be clearly understood and reproduced based on the data. 
+3. Freshness check: before relying on a capability claim, the agent re-verifies it against current web sources and flags discrepancies rather than trusting a static snapshot silently.
+4. Dashboard tool: we can check every output and recompute the attractiveness score based on the weights we chose. 
+
+
+## 💫 Top 5 unique features of our radar
+
+1. Before any signal becomes an "opportunity," it's checked against a researched (not hallucinated) document of Orange's actual deployed capabilities, including geographic scope. If Orange already does it in that market, it's skipped — the radar surfaces genuine gaps, not noise.
+2. The attractiveness score is computed by four metrics directly from the data we collected. Only the strategic relevance is an LLM judment call. Therefore, it is mostly a deterministic score. The weight of the LLM can also be nulled (see point 3) by the user.
+3. The final attractiveness score can be modified by customed weights by the user based on the signal of interest. 
+4. All signals that were used to generate the opportunity space are available (URLs). We also have a "capability check note" that documents what the LLM verified before it created the OS. 
+5. The user can classify an OS as "watchlist", "rejected" or "".
 
 
 
 ## 🔍 Limitations and future outlooks
 
+1. Our pipeline is based on a prompt that gathers the signals based on keywords we extracted from the client's presentation, and the information we found online about their business. To make the prompt even stronger, we recommend that the client introduces their own strategic keywords based on their internal information. 
+2. Our scripts are run manually. Going forward, we would suggest to automate this process and schedule a monthly update - we consider that a timeline of a month is a nice balance between noise information and upcoming market trend. 
+3. We will implement an action plan to orient Orange Business on whether they need to pursue or not the OS. 
+4. The OS identified are country-agnostic. Before the client decides to pursue one, they need to be informed about the local regulations for this implementation to occur. 
 
-
-## 👽 Usage of AI and its importance
-
-## 💡 Scoring explained 
-
-## ✅ Accuracy of results 
 
 ## ⚔️ Challenges 
 - country name: because of prompt eg USA or united states etc. 
