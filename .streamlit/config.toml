@@ -1,0 +1,19 @@
+[theme]
+primaryColor = "#FF7900"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F2F2F2"
+textColor = "#333333"
+font = "sans serif"
+
+[server]
+headless = true
+
+# Without the watchdog module installed, Streamlit falls back to a POLLING file
+# watcher that walks the whole app directory on startup and on every rerun.
+# .venv/ lives inside this project and holds tens of thousands of files, so that
+# walk makes the first page load crawl. Excluding it fixes the slowness without
+# needing `xcode-select --install` + `pip install watchdog`.
+folderWatchBlacklist = [".venv", "venv", ".git", "data", "__pycache__", ".vscode"]
+
+[browser]
+gatherUsageStats = false

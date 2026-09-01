@@ -1,0 +1,406 @@
+{
+  "Private 5G": {
+    "score": 67.52830188679245,
+    "fetched_at": "2026-08-27T15:35:06.495020"
+  },
+  "private 5G": {
+    "score": 70.11320754716981,
+    "fetched_at": "2026-08-24T14:48:51.155070"
+  },
+  "Private 5G+MEC": {
+    "score": 59.490566037735846,
+    "fetched_at": "2026-08-24T14:58:14.485144"
+  },
+  "Private 5G + MEC": {
+    "score": 59.490566037735846,
+    "fetched_at": "2026-08-24T14:59:06.571480"
+  },
+  "FTTH fibre": {
+    "score": 42.490566037735846,
+    "fetched_at": "2026-08-24T14:59:49.040874"
+  },
+  "Edge cloud federation": {
+    "score": 1.8867924528301887,
+    "fetched_at": "2026-08-24T15:00:15.066667"
+  },
+  "FTTH mapping": {
+    "score": 3.7547169811320753,
+    "fetched_at": "2026-08-28T09:38:39.268112"
+  },
+  "Private MEC": {
+    "score": 44.79245283018868,
+    "fetched_at": "2026-08-24T15:09:04.679822"
+  },
+  "Gigabit fiber": {
+    "score": 50.490566037735846,
+    "fetched_at": "2026-08-24T15:10:36.033060"
+  },
+  "Federated edge cloud": {
+    "score": 24.77358490566038,
+    "fetched_at": "2026-08-24T15:10:58.727725"
+  },
+  "Fiber-to-the-home": {
+    "score": 8.11320754716981,
+    "fetched_at": "2026-08-24T15:11:26.971608"
+  },
+  "edge nodes": {
+    "score": 47.339622641509436,
+    "fetched_at": "2026-08-24T15:12:12.990358"
+  },
+  "Hyperscaler partnership": {
+    "score": 36.0,
+    "fetched_at": "2026-08-26T16:42:20.888633"
+  },
+  "FTTH": {
+    "score": 75.66037735849056,
+    "fetched_at": "2026-08-24T15:43:24.204964"
+  },
+  "Edge federation": {
+    "score": 51.735849056603776,
+    "fetched_at": "2026-08-24T15:21:53.218339"
+  },
+  "Edge computing": {
+    "score": 62.18867924528302,
+    "fetched_at": "2026-08-24T15:33:19.125472"
+  },
+  "Telco-hyperscaler": {
+    "score": null,
+    "fetched_at": "2026-08-24T15:35:09.995888"
+  },
+  "telco-native AI": {
+    "score": null,
+    "fetched_at": "2026-08-27T15:39:56.143734"
+  },
+  "hyperscaler partnership": {
+    "score": 33.905660377358494,
+    "fetched_at": "2026-08-24T15:36:19.845734"
+  },
+  "Unified SASE": {
+    "score": 31.09433962264151,
+    "fetched_at": "2026-08-24T15:37:10.621559"
+  },
+  "Cloud-native SASE": {
+    "score": 1.8867924528301887,
+    "fetched_at": "2026-08-24T15:38:13.306968"
+  },
+  "AI-driven SecOps": {
+    "score": null,
+    "fetched_at": "2026-08-28T09:42:52.669064"
+  },
+  "Sovereign cloud": {
+    "score": 55.509433962264154,
+    "fetched_at": "2026-08-24T15:41:40.471824"
+  },
+  "Dark fiber": {
+    "score": 41.867924528301884,
+    "fetched_at": "2026-08-24T15:44:07.915077"
+  },
+  "Federated telco-edge-cloud": {
+    "score": null,
+    "fetched_at": "2026-08-24T15:44:52.418823"
+  },
+  "Governance platform": {
+    "score": 62.283018867924525,
+    "fetched_at": "2026-08-24T15:45:31.847172"
+  },
+  "Governed AI stack": {
+    "score": null,
+    "fetched_at": "2026-08-24T15:51:40.505768"
+  },
+  "Hyperscaler-integrated AI": {
+    "score": null,
+    "fetched_at": "2026-08-28T09:47:48.650953"
+  },
+  "Hyperscaler sovereign": {
+    "score": null,
+    "fetched_at": "2026-08-24T16:02:41.319376"
+  },
+  "Multi-cloud gateway": {
+    "score": null,
+    "fetched_at": "2026-08-26T16:59:40.006330"
+  },
+  "AI-ready hyperscale DC": {
+    "score": null,
+    "fetched_at": "2026-08-24T16:14:29.869884"
+  },
+  "public-cloud core": {
+    "score": null,
+    "fetched_at": "2026-08-24T16:20:29.165344"
+  },
+  "regulated cloud": {
+    "score": null,
+    "fetched_at": "2026-08-24T16:26:45.650613"
+  },
+  "Agentic AI orchestration": {
+    "score": 40.18867924528302,
+    "fetched_at": "2026-08-27T15:48:08.562424"
+  },
+  "AI Grid": {
+    "score": 54.37735849056604,
+    "fetched_at": "2026-08-26T16:29:17.919415"
+  },
+  "MEC": {
+    "score": 57.886792452830186,
+    "fetched_at": "2026-08-26T16:30:54.494863"
+  },
+  "Federated edge": {
+    "score": 43.943396226415096,
+    "fetched_at": "2026-08-26T16:31:45.000485"
+  },
+  "telco-hyperscaler": {
+    "score": null,
+    "fetched_at": "2026-08-26T16:33:26.707349"
+  },
+  "SASE": {
+    "score": 71.0754716981132,
+    "fetched_at": "2026-08-26T16:33:40.001348"
+  },
+  "Telco AI": {
+    "score": 52.283018867924525,
+    "fetched_at": "2026-08-26T16:34:23.467334"
+  },
+  "Hyperscaler-native fiber": {
+    "score": null,
+    "fetched_at": "2026-08-26T16:35:11.007703"
+  },
+  "Autonomous security": {
+    "score": 42.509433962264154,
+    "fetched_at": "2026-08-26T16:35:29.582850"
+  },
+  "SASE/SSE": {
+    "score": 1.8867924528301887,
+    "fetched_at": "2026-08-26T16:36:56.267505"
+  },
+  "AI-driven SOC": {
+    "score": 5.7924528301886795,
+    "fetched_at": "2026-08-26T16:37:34.638396"
+  },
+  "Sovereign AI cloud": {
+    "score": 35.301886792452834,
+    "fetched_at": "2026-08-26T16:39:24.385441"
+  },
+  "Fiber networks": {
+    "score": 56.43396226415094,
+    "fetched_at": "2026-08-26T16:40:06.205238"
+  },
+  "dark fiber": {
+    "score": 41.264150943396224,
+    "fetched_at": "2026-08-26T16:40:43.364998"
+  },
+  "Edge-cloud federation": {
+    "score": null,
+    "fetched_at": "2026-08-26T16:41:16.737469"
+  },
+  "Operator-hyperscaler integration": {
+    "score": null,
+    "fetched_at": "2026-08-26T16:41:30.944476"
+  },
+  "Observability": {
+    "score": 51.79245283018868,
+    "fetched_at": "2026-08-26T16:41:43.009699"
+  },
+  "sovereign cloud": {
+    "score": null,
+    "fetched_at": "2026-08-26T16:54:05.842555"
+  },
+  "hyperscaler-integrated AI": {
+    "score": null,
+    "fetched_at": "2026-08-26T16:48:43.481005"
+  },
+  "AI data centres": {
+    "score": null,
+    "fetched_at": "2026-08-26T17:05:07.683414"
+  },
+  "hyperscaler cloud": {
+    "score": null,
+    "fetched_at": "2026-08-26T17:10:30.248144"
+  },
+  "Regulated cloud": {
+    "score": 55.113207547169814,
+    "fetched_at": "2026-08-28T09:49:51.251000"
+  },
+  "Sovereign hybrid AI": {
+    "score": null,
+    "fetched_at": "2026-08-26T17:21:27.283655"
+  },
+  "Managed security": {
+    "score": null,
+    "fetched_at": "2026-08-26T17:27:15.897715"
+  },
+  "Upstream network visibility": {
+    "score": null,
+    "fetched_at": "2026-08-26T17:32:38.995219"
+  },
+  "Cortex XSIAM": {
+    "score": null,
+    "fetched_at": "2026-08-26T17:38:07.332557"
+  },
+  "Edge inference": {
+    "score": 45.943396226415096,
+    "fetched_at": "2026-08-27T15:36:15.214937"
+  },
+  "Fiber + Private 5G + MEC": {
+    "score": 66.54716981132076,
+    "fetched_at": "2026-08-27T15:37:03.576701"
+  },
+  "FTTH partnerships": {
+    "score": null,
+    "fetched_at": "2026-08-27T15:38:07.047098"
+  },
+  "Hyperscaler-integrated cloud": {
+    "score": null,
+    "fetched_at": "2026-08-27T15:42:52.880312"
+  },
+  "network-to-cloud": {
+    "score": null,
+    "fetched_at": "2026-08-27T15:40:24.484446"
+  },
+  "Fiber & FWA": {
+    "score": null,
+    "fetched_at": "2026-08-27T15:42:15.476725"
+  },
+  "Telco-Edge-Cloud": {
+    "score": null,
+    "fetched_at": "2026-08-27T15:42:38.410160"
+  },
+  "Hyperscaler cloud + GenAI": {
+    "score": 76.33962264150944,
+    "fetched_at": "2026-08-27T15:44:42.754402"
+  },
+  "Hyperscaler-integrated agentic AI": {
+    "score": null,
+    "fetched_at": "2026-08-27T15:45:29.757792"
+  },
+  "Hyperscaler sovereign cloud": {
+    "score": 2.150943396226415,
+    "fetched_at": "2026-08-27T15:45:41.562086"
+  },
+  "Agentic AI": {
+    "score": null,
+    "fetched_at": "2026-08-27T16:13:52.319943"
+  },
+  "Managed XDR": {
+    "score": 54.471698113207545,
+    "fetched_at": "2026-08-27T15:49:45.820073"
+  },
+  "AI-driven MDR": {
+    "score": 4.981132075471698,
+    "fetched_at": "2026-08-27T15:50:39.250717"
+  },
+  "MxDR": {
+    "score": null,
+    "fetched_at": "2026-08-27T16:03:04.711461"
+  },
+  "Generative AI partnerships": {
+    "score": null,
+    "fetched_at": "2026-08-27T16:08:29.395458"
+  },
+  "AI-native SecOps": {
+    "score": null,
+    "fetched_at": "2026-08-27T16:19:11.915084"
+  },
+  "Edge 5G": {
+    "score": 69.09433962264151,
+    "fetched_at": "2026-08-28T09:18:51.752058"
+  },
+  "Private 5G+Edge AI": {
+    "score": 57.056603773584904,
+    "fetched_at": "2026-08-28T09:19:49.785932"
+  },
+  "private 5G+MEC": {
+    "score": 59.113207547169814,
+    "fetched_at": "2026-08-28T09:20:38.857603"
+  },
+  "edge computing": {
+    "score": 61.15094339622642,
+    "fetched_at": "2026-08-28T09:23:28.233172"
+  },
+  "Telco-native AI": {
+    "score": null,
+    "fetched_at": "2026-08-28T09:24:42.739342"
+  },
+  "Fiber-cloud integration": {
+    "score": null,
+    "fetched_at": "2026-08-28T09:25:07.744868"
+  },
+  "private 5G + MEC": {
+    "score": 59.113207547169814,
+    "fetched_at": "2026-08-28T09:36:11.927875"
+  },
+  "Federated Edge": {
+    "score": 44.41509433962264,
+    "fetched_at": "2026-08-28T09:37:46.432250"
+  },
+  "Hyperscaler-integrated": {
+    "score": null,
+    "fetched_at": "2026-08-28T09:39:49.425398"
+  },
+  "AI for core networks": {
+    "score": 49.943396226415096,
+    "fetched_at": "2026-08-28T09:40:12.682616"
+  },
+  "hyperscaler integration": {
+    "score": 36.15094339622642,
+    "fetched_at": "2026-08-28T09:41:01.066408"
+  },
+  "AI-native security": {
+    "score": 33.679245283018865,
+    "fetched_at": "2026-08-28T09:41:41.015742"
+  },
+  "industrial AI cloud": {
+    "score": 49.75471698113208,
+    "fetched_at": "2026-08-28T09:43:22.088732"
+  },
+  "Fiber & fixed wireless": {
+    "score": 7.2075471698113205,
+    "fetched_at": "2026-08-28T09:44:07.019530"
+  },
+  "Operator-hyperscaler sovereign cloud": {
+    "score": 1.8867924528301887,
+    "fetched_at": "2026-08-28T09:45:07.918293"
+  },
+  "AI observability": {
+    "score": 46.679245283018865,
+    "fetched_at": "2026-08-28T09:45:55.047855"
+  },
+  "Multi-cloud Gateway": {
+    "score": 3.5283018867924527,
+    "fetched_at": "2026-08-28T09:46:34.952394"
+  },
+  "Hyperscale AI cloud": {
+    "score": 42.0188679245283,
+    "fetched_at": "2026-08-28T09:48:36.125471"
+  },
+  "Agentic orchestration": {
+    "score": 46.24528301886792,
+    "fetched_at": "2026-08-28T09:50:34.238077"
+  },
+  "FTTH network": {
+    "score": 53.79245283018868,
+    "fetched_at": "2026-08-28T09:51:31.660112"
+  },
+  "Sovereign/local cloud": {
+    "score": null,
+    "fetched_at": "2026-08-28T09:52:34.845888"
+  },
+  "Upstream network telemetry": {
+    "score": null,
+    "fetched_at": "2026-08-28T09:53:01.779392"
+  },
+  "AI-driven XSIAM": {
+    "score": 3.4339622641509435,
+    "fetched_at": "2026-08-28T09:53:36.691131"
+  },
+  "generative AI": {
+    "score": null,
+    "fetched_at": "2026-08-28T10:00:51.510200"
+  },
+  "Agentic AI agents": {
+    "score": null,
+    "fetched_at": "2026-08-28T10:06:09.766478"
+  },
+  "AI-native SOC": {
+    "score": null,
+    "fetched_at": "2026-08-28T10:11:29.390183"
+  }
+}
