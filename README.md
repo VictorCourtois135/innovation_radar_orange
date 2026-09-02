@@ -128,7 +128,7 @@ The application of the innovation radar opens as the following view:
 3. On the "Top opportunities" page, you can view the opportunities in detail. They are named as follows:
    vertical x usecase x technology
 
-![](assets/top_opportunities.png)
+ ![](assets/top_opportunities.png)
 
 * If you select one of them, the redirects you to the page "opportunity detail" where you can view in detail how the opportunity was obtained. This includes detailed **'Overview',  'Why this is hot now',  'Why it matters to Orange', 'Recommended next action', 'Capability check' and 'Supporting signals' .** 
 
