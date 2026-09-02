@@ -132,11 +132,12 @@ The application of the innovation radar opens as the following view:
 
 * If you select one of them, the redirects you to the page "opportunity detail" where you can view in detail how the opportunity was obtained. This includes detailed **'Overview',  'Why this is hot now',  'Why it matters to Orange', 'Recommended next action', 'Capability check' and 'Supporting signals' .** 
 
-![1788342018188](image/README/1788342018188.png)
 
-![1788342027981](image/README/1788342027981.png)
+![](assets/os_detail_1.png)
 
-![1788342041834](image/README/1788342041834.png)
+![img](assets/os_detail_2.png)
+
+![](assets/os_detail_3.png)
 
 ## 💡 Attractiveness score for each OS and Scoring model simulator
 
@@ -172,7 +173,7 @@ For each of these scores, a weight is attributed and they are summed as in the f
 
 These scores were suggested by the client. In our app, we also give the power to the user to change the weight of the scores based on the signal they are interested in the most.
 
-![1788340643247](image/README/1788340643247.png)
+![](<assets/scoring simulator.png>)
 
 ## ✅ Accuracy of results
 
