@@ -221,3 +221,8 @@ __marimo__/
 .env
 .DS_Store
  
+.env
+.streamlit/secrets.toml
+__pycache__/
+*.pyc
+data - Copy/
