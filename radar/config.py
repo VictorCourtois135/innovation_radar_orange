@@ -172,9 +172,9 @@ SIGNAL_COLUMNS = [
 CACHE_TTL_SECONDS = 300  # refresh from the database at most every 5 minutes
 
 SNAPSHOT_DIR = "data"
-SNAPSHOT_OPPORTUNITIES = "snapshot_opportunities.csv"
-SNAPSHOT_SIGNALS = "snapshot_signals.csv"
-SNAPSHOT_LINKS = "snapshot_links.csv"
+SNAPSHOT_OPPORTUNITIES = "opportunity_spaces.csv"
+SNAPSHOT_SIGNALS = "signals.csv"
+SNAPSHOT_LINKS = "opportunity_space_signals.csv"
 
 # Column names that changed during the project. Keys are old names still found
 # in older CSV exports, values are the names the database and the app now use.
